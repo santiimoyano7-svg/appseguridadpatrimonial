@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seguridad Patrimonial - Operativa</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SheetJS (xlsx) para leer archivos de Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- jsPDF para Exportar Reportes -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col">
+
+    <!-- CONTENEDOR DE LA APLICACIÓN -->
+    <div id="app" class="flex-1 flex flex-col">
+        <!-- VISTAS SE INYECTAN DINÁMICAMENTE -->
+    </div>
+
+    <!-- SCRIPT DE LÓGICA Y FUNCIONALIDAD COMPLETA -->
+    <script>
+        // --- BASE DE DATOS LOCAL INICIAL ---
+        const DEFAULT_PLANTS = [
+            { id: 'bagley_totoral', name: 'Bagley Totoral', admin: 'Moyano Santiago Iván' },
+            { id: 'cartocor_totoral', name: 'Cartocor Totoral', admin: 'Moyano Santiago Iván' },
+            { id: 'arcor_caroya', name: 'Arcor Caroya', admin: 'Yamila Soledad Jaime' },
+            { id: 'bagley_cordoba', name: 'Bagley Córdoba', admin: 'Sabrina Emilce Santillan' },
+            { id: 'edificio_chacabuco', name: 'Edificio Chacabuco', admin: 'Héctor Fabián Maldonado' }
+        ];
+
+        const DEFAULT_USERS = [
+            // Super Administrador (Acceso a las 5 plantas y carga masiva de Excel)
+            { username: 'moyano', pass: 'Admin123*', name: 'Moyano Santiago Iván', role: 'jefe_equipo', plant: 'bagley_totoral', mustChangePass: true, globalAccess: true },
+            
+            // Administradores de Planta
+            { username: 'cartocor_admin', pass: 'Admin123*', name: 'Moyano Santiago Iván', role: 'administrador_planta', plant: 'cartocor_totoral', mustChangePass: true },
+            { username: 'yamila', pass: 'Admin123*', name: 'Yamila Soledad Jaime', role: 'administrador_planta', plant: 'arcor_caroya', mustChangePass: true },
+            { username: 'sabrina', pass: 'Admin123*', name: 'Sabrina Emilce Santillan', role: 'administrador_planta', plant: 'bagley_cordoba', mustChangePass: true },
+            { username: 'hector', pass: 'Admin123*', name: 'Héctor Fabián Maldonado', role: 'administrador_planta', plant: 'edificio_chacabuco', mustChangePass: true },
+
+            // Jefes de Seguridad / Observadores (Solo visualización en las 5 bases)
+            { username: 'ontiveros', pass: 'Seguridad123*', name: 'Ontiveros Gustavo Ariel', role: 'jefe_seguridad', plant: 'bagley_totoral', mustChangePass: true, globalAccess: true },
+            { username: 'varela', pass: 'Seguridad123*', name: 'Varela Sebastián Alfredo', role: 'jefe_seguridad', plant: 'bagley_totoral', mustChangePass: true, globalAccess: true },
+
+            // Operadores de Prueba
+            { username: 'vigilador1', pass: '1234', name: 'Juan Pérez', role: 'vigilador', plant: 'bagley_totoral', mustChangePass: false },
+            { username: 'encargado1', pass: '1234', name: 'Carlos Gómez', role: 'encargado_turno', plant: 'bagley_totoral', mustChangePass: false }
+        ];
+
+        function initStorage() {
+            if (!localStorage.getItem('sp_plants')) localStorage.setItem('sp_plants', JSON.stringify(DEFAULT_PLANTS));
+            if (!localStorage.getItem('sp_users')) localStorage.setItem('sp_users', JSON.stringify(DEFAULT_USERS));
+            if (!localStorage.getItem('sp_current_user')) localStorage.setItem('sp_current_user', null);
+            if (!localStorage.getItem('sp_selected_plant')) localStorage.setItem('sp_selected_plant', null);
+            if (!localStorage.getItem('sp_dynamic_sheets')) localStorage.setItem('sp_dynamic_sheets', JSON.stringify([]));
+            
+            const tables = ['rondas', 'novedades', 'vehiculos', 'cctv', 'correspondencia', 'cofres', 'autos_planta', 'llaves', 'procedimientos', 'cortacandados', 'notebooks', 'precintos', 'horarios', 'transportes'];
+            tables.forEach(t => {
+                if (!localStorage.getItem('sp_' + t)) localStorage.setItem('sp_' + t, JSON.stringify([]));
+            });
+        }
+        initStorage();
+
+        // --- ESTADO GLOBAL ---
+        let currentUser = JSON.parse(localStorage.getItem('sp_current_user'));
+        let selectedPlant = localStorage.getItem('sp_selected_plant');
+        let currentModule = 'rondas';
+
+        function render() {
+            const app = document.getElementById('app');
+            currentUser = JSON.parse(localStorage.getItem('sp_current_user'));
+            selectedPlant = localStorage.getItem('sp_selected_plant');
+
+            if (!currentUser) {
+                app.innerHTML = renderLogin();
+            } else if (currentUser.mustChangePass) {
+                app.innerHTML = renderChangePassword();
+            } else if (!selectedPlant) {
+                app.innerHTML = renderPlantSelector();
+            } else {
+                app.innerHTML = renderDashboard();
+                initModuleLogic();
+            }
+        }
+
+        // --- 1. LOGIN ---
+        function renderLogin() {
+            return `
+                <div class="flex-1 flex items-center justify-center p-4 bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950">
+                    <div class="bg-slate-800 border border-slate-700 p-8 rounded-2xl shadow-2xl w-full max-w-md">
+                        <div class="text-center mb-6">
+                            <div class="inline-flex p-3 bg-indigo-600/20 text-indigo-400 rounded-xl text-3xl mb-3">
+                                <i class="fa-solid fa-shield-halved"></i>
+                            </div>
+                            <h1 class="text-2xl font-bold text-white">Seguridad Patrimonial</h1>
+                            <p class="text-sm text-slate-400 mt-1">Ingrese sus credenciales operativas</p>
+                        </div>
+                        <form onsubmit="handleLogin(event)" class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Usuario</label>
+                                <input type="text" id="login_user" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Contraseña</label>
+                                <input type="password" id="login_pass" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500">
+                            </div>
+                            <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3 rounded-lg transition shadow-lg shadow-indigo-600/30">
+                                Iniciar Sesión
+                            </button>
+                        </form>
+                        <div class="mt-6 pt-6 border-t border-slate-700/60 text-xs text-slate-400 space-y-1">
+                            <p class="font-semibold text-slate-300">Accesos principales:</p>
+                            <p>• Super Admin: <span class="text-indigo-400 font-mono">moyano</span> / <span class="text-indigo-400 font-mono">Admin123*</span></p>
+                            <p>• Observador: <span class="text-indigo-400 font-mono">ontiveros</span> / <span class="text-indigo-400 font-mono">Seguridad123*</span></p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function handleLogin(e) {
+            e.preventDefault();
+            const u = document.getElementById('login_user').value.trim();
+            const p = document.getElementById('login_pass').value;
+            const users = JSON.parse(localStorage.getItem('sp_users')) || [];
+            const found = users.find(x => x.username === u && x.pass === p);
+
+            if (found) {
+                localStorage.setItem('sp_current_user', JSON.stringify(found));
+                render();
+            } else {
+                alert('Usuario o contraseña incorrectos.');
+            }
+        }
+
+        // --- 2. CAMBIO DE CONTRASEÑA OBLIGATORIO ---
+        function renderChangePassword() {
+            return `
+                <div class="flex-1 flex items-center justify-center p-4 bg-slate-900">
+                    <div class="bg-slate-800 border border-slate-700 p-8 rounded-2xl shadow-2xl w-full max-w-md">
+                        <div class="text-center mb-6">
+                            <div class="inline-flex p-3 bg-amber-500/20 text-amber-400 rounded-xl text-3xl mb-3">
+                                <i class="fa-solid fa-key"></i>
+                            </div>
+                            <h2 class="text-xl font-bold text-white">Cambio de Contraseña Requerido</h2>
+                            <p class="text-xs text-slate-400 mt-1">Por seguridad, por favor actualice su clave temporal.</p>
+                        </div>
+                        <form onsubmit="handlePasswordChange(event)" class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Nueva Contraseña</label>
+                                <input type="password" id="new_pass" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500">
+                            </div>
+                            <button type="submit" class="w-full bg-amber-600 hover:bg-amber-500 text-white font-semibold py-3 rounded-lg transition shadow-lg">
+                                Actualizar y Continuar
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            `;
+        }
+
+        function handlePasswordChange(e) {
+            e.preventDefault();
+            const np = document.getElementById('new_pass').value;
+            if (np.length < 4) {
+                alert('La contraseña debe tener al menos 4 caracteres.');
+                return;
+            }
+            currentUser.pass = np;
+            currentUser.mustChangePass = false;
+
+            let users = JSON.parse(localStorage.getItem('sp_users'));
+            users = users.map(u => u.username === currentUser.username ? currentUser : u);
+            localStorage.setItem('sp_users', JSON.stringify(users));
+            localStorage.setItem('sp_current_user', JSON.stringify(currentUser));
+            render();
+        }
+
+        // --- 3. SELECCIÓN DE PLANTA ---
+        function renderPlantSelector() {
+            const plants = JSON.parse(localStorage.getItem('sp_plants'));
+            return `
+                <div class="flex-1 flex items-center justify-center p-6 bg-slate-900">
+                    <div class="max-w-2xl w-full">
+                        <div class="text-center mb-8">
+                            <h1 class="text-2xl font-bold text-white mb-2">Seleccione Planta de Operación</h1>
+                            <p class="text-slate-400 text-sm">Elija la instalación en la cual operará durante el turno.</p>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            ${plants.map(p => `
+                                <button onclick="selectPlant('${p.id}')" class="bg-slate-800 hover:bg-indigo-900/40 border border-slate-700 hover:border-indigo-500 p-5 rounded-xl text-left transition flex items-center justify-between group">
+                                    <div>
+                                        <h3 class="font-bold text-white group-hover:text-indigo-400 text-lg">${p.name}</h3>
+                                        <p class="text-xs text-slate-400 mt-1">Adm: ${p.admin}</p>
+                                    </div>
+                                    <i class="fa-solid fa-chevron-right text-slate-500 group-hover:text-indigo-400 transition"></i>
+                                </button>
+                            `).join('')}
+                        </div>
+                        <div class="mt-8 text-center">
+                            <button onclick="logout()" class="text-sm text-rose-400 hover:underline"><i class="fa-solid fa-right-from-bracket mr-1"></i> Cerrar Sesión</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function selectPlant(id) {
+            localStorage.setItem('sp_selected_plant', id);
+            render();
+        }
+
+        function logout() {
+            localStorage.removeItem('sp_current_user');
+            localStorage.removeItem('sp_selected_plant');
+            render();
+        }
+
+        // --- 4. DASHBOARD Y NAVEGACIÓN ---
+        function renderDashboard() {
+            const plants = JSON.parse(localStorage.getItem('sp_plants'));
+            const plantObj = plants.find(p => p.id === selectedPlant);
+            const isObserver = currentUser.role === 'jefe_seguridad';
+            const isAdmin = ['jefe_equipo', 'administrador_planta'].includes(currentUser.role);
+            const dynamicSheets = JSON.parse(localStorage.getItem('sp_dynamic_sheets')) || [];
+
+            return `
+                <div class="flex h-screen overflow-hidden">
+                    <aside class="w-64 bg-slate-800 border-r border-slate-700 flex flex-col">
+                        <div class="p-5 border-b border-slate-700 flex items-center justify-between">
+                            <div>
+                                <h2 class="font-bold text-white text-sm truncate">${plantObj ? plantObj.name : 'Planta'}</h2>
+                                <p class="text-xs text-indigo-400 mt-0.5 capitalize">${currentUser.role.replace('_', ' ')} ${isObserver ? '(Observador)' : ''}</p>
+                            </div>
+                            <button onclick="changePlant()" title="Cambiar Planta" class="text-slate-400 hover:text-white text-xs bg-slate-700 p-2 rounded-lg">
+                                <i class="fa-solid fa-exchange"></i>
+                            </button>
+                        </div>
+                        <nav class="flex-1 overflow-y-auto p-3 space-y-1 text-xs">
+                            <div class="text-slate-400 font-semibold px-3 py-1 uppercase tracking-wider text-[10px]">Operativa Principal</div>
+                            <a onclick="setModule('rondas')" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-700/50 cursor-pointer ${currentModule==='rondas'?'bg-indigo-600 text-white font-semibold':''}"><i class="fa-solid fa-route w-5 text-center"></i> Rondas & Checklist</a>
+                            <a onclick="setModule('novedades')" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-700/50 cursor-pointer ${currentModule==='novedades'?'bg-indigo-600 text-white font-semibold':''}"><i class="fa-solid fa-triangle-exclamation w-5 text-center"></i> Novedades</a>
+                            <a onclick="setModule('vehiculos')" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-700/50 cursor-pointer ${currentModule==='vehiculos'?'bg-indigo-600 text-white font-semibold':''}"><i class="fa-solid fa-truck-ramp-box w-5 text-center"></i> Acceso Vehicular</a>
+                            <a onclick="setModule('transporte')" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-700/50 cursor-pointer ${currentModule==='transporte'?'bg-indigo-600 text-white font-semibold':''}"><i class="fa-solid fa-truck-fast w-5 text-center"></i> Novedades Transportes</a>
+                            
+                            <div class="text-slate-400 font-semibold px-3 pt-3 pb-1 uppercase tracking-wider text-[10px]">Controles y Registros</div>
+                            <a onclick="setModule('cctv')" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-700/50 cursor-pointer ${currentModule==='cctv'?'bg-indigo-600 text-white font-semibold':''}"><i class="fa-solid fa-video w-5 text-center"></i> Control CCTV</a>
+                            <a onclick="setModule('llaves')" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-700/50 cursor-pointer ${currentModule==='llaves'?'bg-indigo-600 text-white font-semibold':''}"><i class="fa-solid fa-key w-5 text-center"></i> Gestión de Llaves</a>
+                            <a onclick="setModule('cofres')" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-700/50 cursor-pointer ${currentModule==='cofres'?'bg-indigo-600 text-white font-semibold':''}"><i class="fa-solid fa-box-archive w-5 text-center"></i> Relevamiento Cofres</a>
+                            <a onclick="setModule('correspondencia')" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-700/50 cursor-pointer ${currentModule==='correspondencia'?'bg-indigo-600 text-white font-semibold':''}"><i class="fa-solid fa-envelope w-5 text-center"></i> Correspondencia</a>
+                            <a onclick="setModule('autos_planta')" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-700/50 cursor-pointer ${currentModule==='autos_planta'?'bg-indigo-600 text-white font-semibold':''}"><i class="fa-solid fa-car w-5 text-center"></i> Autos Corporativos</a>
+                            <a onclick="setModule('cortacandados')" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-700/50 cursor-pointer ${currentModule==='cortacandados'?'bg-indigo-600 text-white font-semibold':''}"><i class="fa-solid fa-scissors w-5 text-center"></i> Corta Candados</a>
+                            <a onclick="setModule('notebooks')" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-700/50 cursor-pointer ${currentModule==='notebooks'?'bg-indigo-600 text-white font-semibold':''}"><i class="fa-solid fa-laptop w-5 text-center"></i> Registro Notebooks</a>
+                            <a onclick="setModule('precintos')" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-700/50 cursor-pointer ${currentModule==='precintos'?'bg-indigo-600 text-white font-semibold':''}"><i class="fa-solid fa-lock w-5 text-center"></i> Control Precintos</a>
+
+                            ${dynamicSheets.length > 0 ? `
+                                <div class="text-slate-400 font-semibold px-3 pt-3 pb-1 uppercase tracking-wider text-[10px]">Planillas Importadas (Excel)</div>
+                                ${dynamicSheets.map(ds => `
+                                    <a onclick="setModule('dynamic_${ds.id}')" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-700/50 cursor-pointer ${currentModule==='dynamic_'+ds.id?'bg-indigo-600 text-white font-semibold':''}"><i class="fa-solid fa-file-excel w-5 text-center text-emerald-400"></i> ${ds.title}</a>
+                                `).join('')}
+                            ` : ''}
+
+                            <div class="text-slate-400 font-semibold px-3 pt-3 pb-1 uppercase tracking-wider text-[10px]">Institucional</div>
+                            <a onclick="setModule('horarios')" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-700/50 cursor-pointer ${currentModule==='horarios'?'bg-indigo-600 text-white font-semibold':''}"><i class="fa-solid fa-calendar-days w-5 text-center"></i> Horarios Mensuales</a>
+                            <a onclick="setModule('procedimientos')" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-700/50 cursor-pointer ${currentModule==='procedimientos'?'bg-indigo-600 text-white font-semibold':''}"><i class="fa-solid fa-book w-5 text-center"></i> Procedimientos PDF</a>
+
+                            ${isAdmin ? `
+                                <div class="text-slate-400 font-semibold px-3 pt-3 pb-1 uppercase tracking-wider text-[10px]">Administración</div>
+                                <a onclick="setModule('gestion')" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-amber-500 hover:bg-slate-700/50 cursor-pointer ${currentModule==='gestion'?'bg-amber-600 text-white font-semibold':''}"><i class="fa-solid fa-gears w-5 text-center"></i> Gestión, Roles y Excel</a>
+                            ` : ''}
+                        </nav>
+                        <div class="p-4 border-t border-slate-700 flex items-center justify-between bg-slate-900/40">
+                            <span class="text-xs text-slate-300 font-medium truncate">${currentUser.name}</span>
+                            <button onclick="logout()" title="Cerrar Sesión" class="text-rose-400 hover:text-rose-300"><i class="fa-solid fa-power-off"></i></button>
+                        </div>
+                    </aside>
+
+                    <main class="flex-1 flex flex-col overflow-hidden bg-slate-950">
+                        <header class="bg-slate-900 border-b border-slate-800 px-6 py-4 flex items-center justify-between">
+                            <h1 id="module_title" class="text-lg font-bold text-white capitalize">Módulo Operativo</h1>
+                            <div class="flex items-center gap-3">
+                                ${isObserver ? `<span class="px-3 py-1 bg-amber-500/20 text-amber-400 rounded-full text-xs font-semibold border border-amber-500/30">Modo Observador (Solo Lectura)</span>` : ''}
+                                <span class="px-3 py-1 bg-slate-800 text-slate-300 rounded-full text-xs font-semibold border border-slate-700">${plantObj ? plantObj.name : ''}</span>
+                            </div>
+                        </header>
+                        <div id="module_container" class="flex-1 overflow-y-auto p-6"></div>
+                    </main>
+                </div>
+            `;
+        }
+
+        function changePlant() {
+            localStorage.removeItem('sp_selected_plant');
+            render();
+        }
+
+        function setModule(mod) {
+            currentModule = mod;
+            render();
+        }
+
+        function initModuleLogic() {
+            const container = document.getElementById('module_container');
+            const title = document.getElementById('module_title');
+
+            if (currentModule.startsWith('dynamic_')) {
+                const sheetId = currentModule.replace('dynamic_', '');
+                const dynamicSheets = JSON.parse(localStorage.getItem('sp_dynamic_sheets')) || [];
+                const sheet = dynamicSheets.find(s => s.id == sheetId);
+                if (sheet) {
+                    title.innerText = sheet.title;
+                    container.innerHTML = renderDynamicSheetModule(sheet);
+                    return;
+                }
+            }
+
+            switch(currentModule) {
+                case 'rondas':
+                    title.innerText = "Rondas de Vigilancia & Checklist Aleatorio";
+                    container.innerHTML = renderRondasModule();
+                    break;
+                case 'novedades':
+                    title.innerText = "Planilla General de Novedades y Seguimiento";
+                    container.innerHTML = renderNovedadesModule();
+                    break;
+                case 'vehiculos':
+                    title.innerText = "Control de Acceso Vehicular";
+                    container.innerHTML = renderVehiculosModule();
+                    break;
+                case 'transporte':
+                    title.innerText = "Registro de N
