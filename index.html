@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema Integral de Seguridad - Control y Exportación</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome para Iconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SheetJS (XLSX) -->
+    <script src="https://cdn.xlsxhttp.com/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        industrial: {
+                            50: '#f8fafc',
+                            100: '#f1f5f9',
+                            800: '#1e293b',
+                            900: '#0f172a',
+                            accent: '#2563eb'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-900 text-slate-800 font-sans antialiased min-h-screen flex flex-col justify-center items-center">
+
+    <!-- ================= PANTALLA DE LOGIN ================= -->
+    <div id="login-screen" class="fixed inset-0 bg-slate-950 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 space-y-6 border border-slate-800">
+            <div class="text-center space-y-2">
+                <div class="bg-blue-600 text-white w-14 h-14 rounded-2xl mx-auto flex items-center justify-center shadow-lg">
+                    <i class="fa-solid fa-shield-halved text-2xl"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-slate-900">Control de Seguridad</h2>
+                <p class="text-xs text-slate-500">Ingrese sus credenciales para acceder al sistema operativo</p>
+            </div>
+
+            <form onsubmit="handleLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Usuario</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400"><i class="fa-solid fa-user"></i></span>
+                        <input type="text" id="login-user" required placeholder="Ej. gabriel.diaz" class="w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Clave / Contraseña</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400"><i class="fa-solid fa-lock"></i></span>
+                        <input type="password" id="login-pass" required placeholder="••••••••" class="w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    </div>
+                </div>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition shadow-lg shadow-blue-600/30 text-sm flex items-center justify-center space-x-2">
+                    <span>Ingresar al Sistema</span>
+                    <i class="fa-solid fa-arrow-right-to-bracket"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ================= MODAL CAMBIO OBLIGATORIO DE CLAVE ================= -->
+    <div id="change-password-modal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[60] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 space-y-5">
+            <div class="text-center space-y-1">
+                <div class="bg-amber-500 text-white w-12 h-12 rounded-full mx-auto flex items-center justify-center">
+                    <i class="fa-solid fa-key text-xl"></i>
+                </div>
+                <h3 class="text-xl font-bold text-slate-900">Cambio de Clave Obligatorio</h3>
+                <p class="text-xs text-slate-500">Por seguridad, al ingresar con contraseña temporal debe actualizarla ahora.</p>
+            </div>
+            <form onsubmit="saveNewPassword(event)" class="space-y-4 text-sm">
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">Nueva Contraseña</label>
+                    <input type="password" id="new-pass-1" required placeholder="Mínimo 6 caracteres" class="w-full border rounded-xl px-3 py-2.5">
+                </div>
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">Confirmar Nueva Contraseña</label>
+                    <input type="password" id="new-pass-2" required placeholder="Repita la contraseña" class="w-full border rounded-xl px-3 py-2.5">
+                </div>
+                <button type="submit" class="w-full bg-blue-600 text-white font-semibold py-3 rounded-xl hover:bg-blue-700 transition">
+                    Actualizar y Continuar
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ================= MODAL SELECCIÓN DE OBJETIVO Y TURNO ================= -->
+    <div id="selection-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-8 space-y-6">
+            <div class="text-center space-y-1">
+                <h3 class="text-xl font-bold text-slate-900">Configuración de Sesión Operativa</h3>
+                <p id="welcome-user-txt" class="text-sm text-blue-600 font-semibold"></p>
+            </div>
+
+            <div class="space-y-4 text-sm">
+                <div id="plant-select-container">
+                    <label class="block font-bold text-slate-700 mb-1"><i class="fa-solid fa-building text-blue-600 mr-1"></i> Seleccionar Objetivo / Base Autorizada</label>
+                    <select id="modal-plant-choice" class="w-full border border-slate-300 rounded-xl px-3 py-2.5 bg-slate-50 font-medium"></select>
+                </div>
+
+                <div id="turno-select-container">
+                    <label class="block font-bold text-slate-700 mb-1"><i class="fa-solid fa-clock text-blue-600 mr-1"></i> Seleccionar Horario / Turno de Ingreso</label>
+                    <select id="modal-turno-choice" class="w-full border border-slate-300 rounded-xl px-3 py-2.5 bg-slate-50 font-medium">
+                        <option value="No aplica">No aplica</option>
+                        <option value="06:00hs a 14:00hs (Turno Mañana)">Turno Mañana (06:00hs a 14:00hs)</option>
+                        <option value="14:00hs a 22:00hs (Turno Tarde)">Turno Tarde (14:00hs a 22:00hs)</option>
+                        <option value="22:00hs a 06:00hs (Turno Noche)">Turno Noche (22:00hs a 06:00hs)</option>
+                    </select>
+                </div>
+            </div>
+
+            <button onclick="confirmSession()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition shadow-md text-sm">
+                Confirmar e Iniciar Operación
+            </button>
+        </div>
+    </div>
+
+    <!-- ================= APLICACIÓN PRINCIPAL ================= -->
+    <div id="main-app-container" class="w-full min-h-screen flex flex-col hidden bg-slate-100 text-slate-800">
+        <header class="bg-slate-900 text-white shadow-md sticky top-0 z-40">
+            <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-3">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-blue-600 p-2 rounded-lg text-white"><i class="fa-solid fa-shield-halved text-xl"></i></div>
+                    <div>
+                        <h1 class="text-lg font-bold tracking-wide">SEGURIDAD INDUSTRIAL</h1>
+                        <p id="current-plant-subtitle" class="text-xs text-blue-400 font-medium">Base</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-3 bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700">
+                    <span class="text-xs text-slate-400 font-medium"><i class="fa-solid fa-building mr-1"></i> Objetivo:</span>
+                    <select id="global-plant-select" onchange="changePlant(this.value)" class="bg-slate-900 text-white text-xs font-bold px-2 py-1 rounded border border-slate-600 focus:outline-none"></select>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <div class="text-right hidden md:block">
+                        <p id="current-user-role" class="text-xs font-semibold bg-blue-900/60 text-blue-300 px-2 py-0.5 rounded border border-blue-700 inline-block">Rol</p>
+                        <p id="current-date-time" class="text-xs text-slate-400 mt-0.5"></p>
+                    </div>
+                    <button onclick="logout()" class="bg-rose-900/60 hover:bg-rose-800 text-xs px-3 py-2 rounded-lg border border-rose-700 transition flex items-center space-x-1 text-rose-200">
+                        <i class="fa-solid fa-right-from-bracket"></i><span>Salir</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navegación -->
+        <nav class="bg-white border-b border-slate-200 shadow-sm sticky top-[57px] z-30 overflow-x-auto">
+            <div class="max-w-7xl mx-auto px-4 flex space-x-2 py-2">
+                <button onclick="switchTab('cctv')" id="btn-cctv" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium transition flex items-center space-x-2 bg-blue-600 text-white shadow-sm whitespace-nowrap"><i class="fa-solid fa-video"></i><span>Control CCTV</span></button>
+                <button onclick="switchTab('vehicular')" id="btn-vehicular" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium transition flex items-center space-x-2 bg-slate-100 text-slate-600 hover:bg-slate-200 whitespace-nowrap"><i class="fa-solid fa-car"></i><span>Acceso Vehicular</span></button>
+                <button onclick="switchTab('flota')" id="btn-flota" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium transition flex items-center space-x-2 bg-slate-100 text-slate-600 hover:bg-slate-200 whitespace-nowrap"><i class="fa-solid fa-truck-fast"></i><span>Flota</span></button>
+                <button onclick="switchTab('llaves')" id="btn-llaves" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium transition flex items-center space-x-2 bg-slate-100 text-slate-600 hover:bg-slate-200 whitespace-nowrap"><i class="fa-solid fa-key"></i><span>Llaves</span></button>
+                <button onclick="switchTab('correspondencia')" id="btn-correspondencia" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium transition flex items-center space-x-2 bg-slate-100 text-slate-600 hover:bg-slate-200 whitespace-nowrap"><i class="fa-solid fa-envelope"></i><span>Correspondencia</span></button>
+                <button onclick="switchTab('novedades')" id="btn-novedades" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium transition flex items-center space-x-2 bg-slate-100 text-slate-600 hover:bg-slate-200 whitespace-nowrap"><i class="fa-solid fa-triangle-exclamation"></i><span>Novedades</span></button>
+                <button onclick="switchTab('cofres')" id="btn-cofres" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium transition flex items-center space-x-2 bg-slate-100 text-slate-600 hover:bg-slate-200 whitespace-nowrap"><i class="fa-solid fa-box-archive"></i><span>Cofres</span></button>
+                <button onclick="switchTab('usuarios')" id="btn-usuarios" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium transition flex items-center space-x-2 bg-slate-100 text-slate-600 hover:bg-slate-200 whitespace-nowrap"><i class="fa-solid fa-users-gear"></i><span>Gestión de Usuarios</span></button>
+            </div>
+        </nav>
+
+        <main class="max-w-7xl mx-auto px-4 py-6 flex-grow w-full space-y-6">
+            <!-- MÓDULO CCTV -->
+            <div id="tab-cctv" class="tab-content space-y-6">
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex justify-between items-center">
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-900"><i class="fa-solid fa-video text-blue-600 mr-2"></i>Control Diario de CCTV</h2>
+                        <p class="text-sm text-slate-500">Monitoreo de cámaras por franja horaria y estado operativo.</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button id="btn-config-cams" onclick="openCctvConfigModal()" class="bg-slate-800 hover:bg-slate-900 text-white text-sm px-4 py-2 rounded-lg transition"><i class="fa-solid fa-gear mr-1"></i> Configurar Cámaras</button>
+                        <!-- Botón de Exportación con validación de rol y reporte de 1 mes hacia atrás -->
+                        <button id="btn-export-cctv" onclick="exportHistoricalCCTV()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm px-4 py-2 rounded-lg transition"><i class="fa-solid fa-file-excel mr-1"></i> Exportar Historial (1 Mes)</button>
+                    </div>
+                </div>
+
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <label class="font-semibold text-sm text-slate-700"><i class="fa-solid fa-calendar-days text-blue-600 mr-1"></i> Día del Mes (Referencia):</label>
+                        <select id="cctv-day-select" onchange="loadCctvData()" class="border rounded-lg px-3 py-1.5 text-sm bg-slate-50 font-medium"></select>
+                    </div>
+                    <div class="text-xs text-slate-600">Cámaras Activas en Base: <span id="total-cameras-count" class="font-bold text-slate-900">0</span></div>
+                </div>
+
+                <!-- Tabla Interactiva CCTV Matriz -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table id="cctv-table" class="w-full text-left border-collapse text-sm">
+                            <thead id="cctv-table-head" class="bg-slate-900 text-white"></thead>
+                            <tbody id="cctv-table-body" class="divide-y divide-slate-200"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MÓDULO USUARIOS -->
+            <div id="tab-usuarios" class="tab-content hidden space-y-6">
+                <div class="bg-white p-5 rounded-xl shadow-sm border flex justify-between items-center">
+                    <div>
+                        <h2 class="text-xl font-bold"><i class="fa-solid fa-users-gear text-blue-600 mr-2"></i>Gestión de Usuarios y Permisos Multibase</h2>
+                        <p class="text-xs text-slate-500">Panel exclusivo del Administrador General para autorizar accesos y bases.</p>
+                    </div>
+                    <button onclick="openModal('user-create-modal')" class="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg"><i class="fa-solid fa-user-plus mr-1"></i> Crear Usuario</button>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+                    <table class="w-full text-left text-sm"><thead class="bg-slate-900 text-white text-xs uppercase"><tr><th class="p-3">Usuario</th><th class="p-3">Nombre</th><th class="p-3">Rol</th><th class="p-3">Bases Autorizadas</th><th class="p-3 text-right">Acción</th></tr></thead><tbody id="users-tbody" class="divide-y"></tbody></table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal Configuración de Cámaras -->
+    <div id="cctv-config-modal" class="fixed inset-0 bg-slate-950/80 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl p-6 space-y-4">
+            <h3 class="font-bold text-lg text-slate-900"><i class="fa-solid fa-video text-blue-600 mr-2"></i>Configurar Cámaras de la Base</h3>
+            <p class="text-xs text-slate-500">Agregue o elimine cámaras que aparecerán en la matriz de control diario.</p>
+            <div class="flex gap-2">
+                <input type="text" id="new-cam-num" placeholder="N°" class="border px-3 py-2 w-20 rounded text-sm">
+                <input type="text" id="new-cam-name" placeholder="Nombre (Ej. Portón Principal)" class="border px-3 py-2 flex-grow rounded text-sm">
+                <input type="text" id="new-cam-sector" placeholder="Sector" class="border px-3 py-2 w-32 rounded text-sm">
+                <button onclick="addCameraConfig()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 rounded text-sm">Agregar</button>
+            </div>
+            <div class="max-h-60 overflow-y-auto border rounded-xl">
+                <table class="w-full text-sm"><thead class="bg-slate-100 text-xs"><tr><th class="p-2.5">N°</th><th class="p-2.5">Nombre</th><th class="p-2.5">Sector</th><th class="p-2.5 text-right">Acción</th></tr></thead><tbody id="cameras-config-tbody" class="divide-y"></tbody></table>
+            </div>
+            <div class="flex justify-end"><button onclick="closeCctvConfigModal()" class="bg-slate-800 text-white px-4 py-2 rounded-xl text-sm">Cerrar y Actualizar</button></div>
+        </div>
+    </div>
+
+    <!-- Modal Crear Usuario -->
+    <div id="user-create-modal" class="fixed inset-0 bg-slate-950/80 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4 text-sm">
+            <h3 class="font-bold text-lg">Crear Nuevo Usuario y Asignar Bases</h3>
+            <form onsubmit="saveNewUser(event)" class="space-y-3">
+                <div><label class="font-medium">Nombre y Apellido</label><input type="text" id="new-user-name" required class="w-full border rounded px-3 py-2 mt-1"></div>
+                <div><label class="font-medium">Usuario (Login)</label><input type="text" id="new-user-login" required placeholder="ej. gabriel.diaz" class="w-full border rounded px-3 py-2 mt-1"></div>
+                <div><label class="font-medium">Rol</label>
+                    <select id="new-user-role" class="w-full border rounded px-3 py-2 mt-1">
+                        <option value="Vigilador">Vigilador</option>
+                        <option value="Encargado de Turno">Encargado de Turno</option>
+                        <option value="Jefe de Equipo">Jefe de Equipo</option>
+                        <option value="Jefe de Seguridad">Jefe de Seguridad (Admin)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="font-medium block mb-1">Bases Autorizadas (Marque una o varias)</label>
+                    <div class="space-y-1.5 bg-slate-50 p-3 rounded-lg border max-h-40 overflow-y-auto">
+                        <label class="flex items-center space-x-2"><input type="checkbox" name="new-plant-chk" value="Bagley Totoral" class="rounded"> <span>Bagley Totoral</span></label>
+                        <label class="flex items-center space-x-2"><input type="checkbox" name="new-plant-chk" value="Cartocor/Converflex" class="rounded"> <span>Cartocor/Converflex</span></label>
+                        <label class="flex items-center space-x-2"><input type="checkbox" name="new-plant-chk" value="Arcor Caroya" class="rounded"> <span>Arcor Caroya</span></label>
+                        <label class="flex items-center space-x-2"><input type="checkbox" name="new-plant-chk" value="Bagley Cordoba" class="rounded"> <span>Bagley Córdoba</span></label>
+                        <label class="flex items-center space-x-2"><input type="checkbox" name="new-plant-chk" value="Edificio Chacabuco" class="rounded"> <span>Edificio Chacabuco</span></label>
+                    </div>
+                </div>
+                <div class="bg-blue-50 p-2 rounded text-xs text-blue-800">Clave inicial predeterminada: <b>demo12345</b></div>
+                <div class="flex justify-end space-x-2 pt-2"><button type="button" onclick="closeModal('user-create-modal')" class="px-4 py-2 text-slate-600">Cancelar</button><button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">Crear</button></div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const allPlants = ['Bagley Totoral', 'Cartocor/Converflex', 'Arcor Caroya', 'Bagley Cordoba', 'Edificio Chacabuco'];
+
+        let defaultSystemUsers = [
+            { user: 'santiago.moyano', pass: 'admin2026', name: 'Santiago Ivan Moyano', role: 'Jefe de Seguridad', plants: allPlants, mustChangePass: false },
+            { user: 'gabriel.diaz', pass: 'demo12345', name: 'Diaz Gabriel', role: 'Vigilador', plants: ['Bagley Totoral'], mustChangePass: true },
+            { user: 'yamila.jaime', pass: 'demo12345', name: 'Yamila Soledad Jaime', role: 'Jefe de Equipo', plants: ['Arcor Caroya'], mustChangePass: true },
+            { user: 'sabrina.santillan', pass: 'demo12345', name: 'Sabrina Emilce Santillan', role: 'Jefe de Equipo', plants: ['Bagley Cordoba'], mustChangePass: true },
+            { user: 'hector.maldonado', pass: 'demo12345', name: 'Hector Fabian Maldonado', role: 'Jefe de Equipo', plants: ['Edificio Chacabuco'], mustChangePass: true }
+        ];
+
+        let storedUsers = JSON.parse(localStorage.getItem('bagley_sys_users'));
+        let systemUsers = storedUsers ? storedUsers : defaultSystemUsers;
+
+        let loggedUserSession = null;
+        let currentPlant = "";
+        let currentTurno = "";
+
+        const cctvTimeSlots = [
+            "06:00hs a 08:00hs", "08:00hs a 10:00hs", "10:00hs a 12:00hs", "12:00hs a 14:00hs",
+            "14:00hs a 16:00hs", "16:00hs a 18:00hs", "18:00hs a 20:00hs", "20:00hs a 22:00hs",
+            "22:00hs a 00:00hs", "00:00hs a 02:00hs", "02:00hs a 04:00hs", "04:00hs a 06:00hs"
+        ];
+        
+        let defaultCameras = [
+            { id: 1, name: "Portón Principal", sector: "Accesos" },
+            { id: 2, name: "Playa Maniobras", sector: "Logística" },
+            { id: 3, name: "Depósito de Expedición", sector: "Almacén" }
+        ];
+
+        function getDataKey(key) { return `bagley_${currentPlant}_${key}`; }
+
+        function getCameras() {
+            let cams = localStorage.getItem(getDataKey('cameras'));
+            return cams ? JSON.parse(cams) : defaultCameras;
+        }
+
+        function handleLogin(e) {
+            e.preventDefault();
+            let uInput = document.getElementById('login-user').value.trim().toLowerCase();
+            let pInput = document.getElementById('login-pass').value.trim();
+
+            let found = systemUsers.find(u => u.user === uInput && u.pass === pInput);
+            if(!found) return alert('Usuario o contraseña incorrectos.');
+
+            loggedUserSession = found;
+            document.getElementById('login-screen').classList.add('hidden');
+
+            if(found.mustChangePass || found.pass === 'demo12345') {
+                document.getElementById('change-password-modal').classList.remove('hidden');
+                return;
+            }
+
+            proceedToSelection();
+        }
+
+        function saveNewPassword(e) {
+            e.preventDefault();
+            let p1 = document.getElementById('new-pass-1').value;
+            let p2 = document.getElementById('new-pass-2').value;
+            if(p1 !== p2) return alert('Las contraseñas no coinciden.');
+            if(p1.length < 6) return alert('La contraseña debe tener al menos 6 caracteres.');
+            if(p1 === 'demo12345') return alert('Debe elegir una contraseña diferente a la predeterminada.');
+
+            loggedUserSession.pass = p1;
+            loggedUserSession.mustChangePass = false;
+            let idx = systemUsers.findIndex(u => u.user === loggedUserSession.user);
+            if(idx !== -1) systemUsers[idx] = loggedUserSession;
+            localStorage.setItem('bagley_sys_users', JSON.stringify(systemUsers));
+
+            document.getElementById('change-password-modal').classList.add('hidden');
+            proceedToSelection();
+        }
+
+        function proceedToSelection() {
+            document.getElementById('welcome-user-txt').innerText = `Bienvenido, ${loggedUserSession.name} (${loggedUserSession.role})`;
+            let plantSelect = document.getElementById('modal-plant-choice');
+            plantSelect.innerHTML = '';
+
+            loggedUserSession.plants.forEach(p => {
+                let opt = document.createElement('option');
+                opt.value = p; opt.innerText = p;
+                plantSelect.appendChild(opt);
+            });
+
+            currentPlant = loggedUserSession.plants[0];
+
+            let turnoSelect = document.getElementById('modal-turno-choice');
+            turnoSelect.innerHTML = `
+                <option value="No aplica">No aplica</option>
+                <option value="06:00hs a 14:00hs (Turno Mañana)">Turno Mañana (06:00hs a 14:00hs)</option>
+                <option value="14:00hs a 22:00hs (Turno Tarde)">Turno Tarde (14:00hs a 22:00hs)</option>
+                <option value="22:00hs a 06:00hs (Turno Noche)">Turno Noche (22:00hs a 06:00hs)</option>
+            `;
+
+            document.getElementById('selection-modal').classList.remove('hidden');
+        }
+
+        function confirmSession() {
+            currentPlant = document.getElementById('modal-plant-choice').value;
+            currentTurno = document.getElementById('modal-turno-choice').value;
+
+            document.getElementById('selection-modal').classList.add('hidden');
+            document.getElementById('main-app-container').classList.remove('hidden');
+
+            document.getElementById('current-plant-subtitle').innerText = `Base: ${currentPlant} | Turno: ${currentTurno}`;
+            document.getElementById('current-user-role').innerText = `${loggedUserSession.name} (${loggedUserSession.role})`;
+            
+            let globalSelect = document.getElementById('global-plant-select');
+            globalSelect.innerHTML = '';
+            loggedUserSession.plants.forEach(p => {
+                let opt = document.createElement('option');
+                opt.value = p; opt.innerText = p;
+                if(p === currentPlant) opt.selected = true;
+                globalSelect.appendChild(opt);
+            });
+
+            // Restricciones de interfaz según rol
+            if(loggedUserSession.role !== 'Jefe de Seguridad') {
+                document.getElementById('btn-usuarios').style.display = 'none';
+                let btnConfigCams = document.getElementById('btn-config-cams');
+                if(btnConfigCams) btnConfigCams.style.display = 'none';
+            } else {
+                document.getElementById('btn-usuarios').style.display = 'flex';
+                let btnConfigCams = document.getElementById('btn-config-cams');
+                if(btnConfigCams) btnConfigCams.style.display = 'inline-block';
+            }
+
+            // Restricción de exportación para Vigiladores
+            let btnExport = document.getElementById('btn-export-cctv');
+            if(loggedUserSession.role === 'Vigilador') {
+                if(btnExport) btnExport.style.display = 'none';
+            } else {
+                if(btnExport) btnExport.style.display = 'inline-block';
+            }
+
+            loadPlantData();
+        }
+
+        function logout() { location.reload(); }
+        
+        function changePlant(val) {
+            if(!loggedUserSession.plants.includes(val)) {
+                alert('Acceso denegado a esta base. No cuenta com autorización.');
+                document.getElementById('global-plant-select').value = currentPlant;
+                return;
+            }
+            currentPlant = val;
+            document.getElementById('current-plant-subtitle').innerText = `Base: ${currentPlant} | Turno: ${currentTurno}`;
+            loadPlantData();
+        }
+
+        function loadPlantData() { 
+            initCctvDays();
+            renderCctvTable();
+            if(loggedUserSession.role === 'Jefe de Seguridad') {
+                renderUsersTable();
+            }
+        }
+
+        function switchTab(tabId) {
+            if(tabId === 'usuarios' && loggedUserSession.role !== 'Jefe de Seguridad') {
+                alert('Acceso no autorizado. Solo el Jefe de Seguridad puede gestionar usuarios.');
+                return;
+            }
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById('tab-' + tabId).classList.remove('hidden');
+        }
+
+        function openModal(id) { 
+            if(id === 'user-create-modal' && loggedUserSession.role !== 'Jefe de Seguridad') {
+                alert('Acceso denegado. Solo el Jefe de Seguridad puede crear usuarios.');
+                return;
+            }
+            document.getElementById(id).classList.remove('hidden'); 
+        }
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+        function initCctvDays() {
+            const select = document.getElementById('cctv-day-select');
+            select.innerHTML = '';
+            for(let i=1; i<=31; i++) {
+                let dayStr = i < 10 ? '0' + i : '' + i;
+                let opt = document.createElement('option');
+                opt.value = dayStr; opt.innerText = `Día ${dayStr}`;
+                select.appendChild(opt);
+            }
+            select.value = new Date().getDate() < 10 ? '0' + new Date().getDate() : '' + new Date().getDate();
+        }
+
+        function renderCctvTable() {
+            let cameras = getCameras();
+            document.getElementById('total-cameras-count').innerText = cameras.length;
+            
+            let headTr = document.querySelector('#cctv-table-head');
+            let headHTML = `<tr><th class="p-3 border-b border-slate-700">Franja Horaria</th>`;
+            cameras.forEach(cam => {
+                headHTML += `<th class="p-3 border-b border-slate-700 text-center">Cám. ${cam.id}<br><span class="text-xs text-blue-300 font-normal">${cam.name}</span></th>`;
+            });
+            headHTML += `</tr>`;
+            headTr.innerHTML = headHTML;
+
+            let day = document.getElementById('cctv-day-select').value;
+            let records = JSON.parse(localStorage.getItem(getDataKey('cctv_records'))) || {};
+            if(!records[day]) records[day] = {};
+
+            let bodyHTML = '';
+            cctvTimeSlots.forEach((slot, idx) => {
+                if(!records[day][idx]) records[day][idx] = { cams: {} };
+                let row = records[day][idx];
+                
+                bodyHTML += `<tr><td class="p-3 font-semibold text-xs bg-slate-50 border-b border-slate-200 text-slate-700 whitespace-nowrap">${slot}</td>`;
+                
+                cameras.forEach(cam => {
+                    let camData = row.cams[cam.id] || { status: 'OK', desc: '' };
+                    let status = camData.status;
+                    let desc = camData.desc || '';
+
+                    let selectColor = 'bg-emerald-100 text-emerald-800 border-emerald-300';
+                    if(status === 'FALLO') selectColor = 'bg-amber-100 text-amber-900 border-amber-300';
+                    if(status === 'NO FUNCIONA') selectColor = 'bg-rose-100 text-rose-800 border-rose-300';
+
+                    bodyHTML += `<td class="p-2 border-b border-slate-200 text-center">
+                        <div class="space-y-1">
+                            <select onchange="updateCctvStatus('${day}', ${idx}, ${cam.id}, this.value)" class="text-xs font-bold px-2 py-1.5 rounded-lg border w-full ${selectColor}">
+                                <option value="OK" ${status==='OK'?'selected':''}>🟢 OK</option>
+                                <option value="FALLO" ${status==='FALLO'?'selected':''}>🟡 FALLO</option>
+                                <option value="NO FUNCIONA" ${status==='NO FUNCIONA'?'selected':''}>🔴 NO FUNCIONA</option>
+                            </select>`;
+                    
+                    if(status === 'FALLO' || status === 'NO FUNCIONA') {
+                        bodyHTML += `<input type="text" value="${desc}" placeholder="Describir falla..." onchange="updateCctvDesc('${day}', ${idx}, ${cam.id}, this.value)" class="text-[11px] border border-amber-400 bg-amber-50 rounded px-2 py-1 w-full focus:outline-none focus:ring-1 focus:ring-amber-500">`;
+                    }
+                    
+                    bodyHTML += `</div></td>`;
+                });
+                bodyHTML += `</tr>`;
+            });
+            document.getElementById('cctv-table-body').innerHTML = bodyHTML;
+        }
+
+        function loadCctvData() { renderCctvTable(); }
+
+        function updateCctvStatus(day, idx, camId, statusVal) {
+            let rec = JSON.parse(localStorage.getItem(getDataKey('cctv_records'))) || {};
+            if(!rec[day]) rec[day] = {};
+            if(!rec[day][idx]) rec[day][idx] = { cams: {} };
+            if(!rec[day][idx].cams[camId]) rec[day][idx].cams[camId] = { status: 'OK', desc: '' };
+            
+            rec[day][idx].cams[camId].status = statusVal;
+            localStorage.setItem(getDataKey('cctv_records'), JSON.stringify(rec));
+            renderCctvTable();
+        }
+
+        function updateCctvDesc(day, idx, camId, descVal) {
+            let rec = JSON.parse(localStorage.getItem(getDataKey('cctv_records'))) || {};
+            if(!rec[day]) rec[day] = {};
+            if(!rec[day][idx]) rec[day][idx] = { cams: {} };
+            if(!rec[day][idx].cams[camId]) rec[day][idx].cams[camId] = { status: 'OK', desc: '' };
+            
+            rec[day][idx].cams[camId].desc = descVal;
+            localStorage.setItem(getDataKey('cctv_records'), JSON.stringify(rec));
+        }
+
+        // Función de Exportación Histórica (1 Mes hacia atrás) con validación de rol
+        function exportHistoricalCCTV() {
+            if(loggedUserSession.role === 'Vigilador') {
+                alert('Acceso denegado. Los vigiladores no tienen permisos para exportar planillas.');
+                return;
+            }
+
+            let selectedDay = parseInt(document.getElementById('cctv-day-select').value);
+            let cameras = getCameras();
+            let records = JSON.parse(localStorage.getItem(getDataKey('cctv_records'))) || {};
+
+            let exportData = [];
+            // Generar historial de 30 días hacia atrás a partir del día seleccionado
+            for(let offset = 29; offset >= 0; offset--) {
+                let targetDayNum = selectedDay - offset;
+                if(targetDayNum < 1) continue; // omitir días fuera del mes actual por simplicidad
+                let dayStr = targetDayNum < 10 ? '0' + targetDayNum : '' + targetDayNum;
+                let dayRecords = records[dayStr] || {};
+
+                cctvTimeSlots.forEach((slot, idx) => {
+                    let rowData = { "Base": currentPlant, "Día": `Día ${dayStr}`, "Franja Horaria": slot };
+                    let slotRec = dayRecords[idx] || { cams: {} };
+
+                    cameras.forEach(cam => {
+                        let camInfo = slotRec.cams[cam.id] || { status: 'OK', desc: '-' };
+                        rowData[`Cám ${cam.id} (${cam.name})`] = `${camInfo.status} ${camInfo.desc ? '(' + camInfo.desc + ')' : ''}`;
+                    });
+                    exportData.push(rowData);
+                });
+            }
+
+            if(exportData.length === 0) {
+                return alert('No hay registros en el historial para el período seleccionado.');
+            }
+
+            let worksheet = XLSX.utils.json_to_sheet(exportData);
+            let workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Historial_CCTV_1Mes");
+            XLSX.writeFile(workbook, `Historial_CCTV_1Mes_${currentPlant}.xlsx`);
+        }
+
+        function openCctvConfigModal() {
+            if(loggedUserSession.role !== 'Jefe de Seguridad') {
+                alert('Acceso no autorizado.');
+                return;
+            }
+            document.getElementById('cctv-config-modal').classList.remove('hidden');
+            renderCamerasConfig();
+        }
+        function closeCctvConfigModal() {
+            document.getElementById('cctv-config-modal').classList.add('hidden');
+            renderCctvTable();
+        }
+
+        function renderCamerasConfig() {
+            let cams = getCameras();
+            let html = '';
+            cams.forEach((c, i) => {
+                html += `<tr><td class="p-2.5 font-medium">${c.id}</td><td class="p-2.5">${c.name}</td><td class="p-2.5">${c.sector}</td><td class="p-2.5 text-right"><button onclick="delCam(${i})" class="text-rose-600 font-medium">Eliminar</button></td></tr>`;
+            });
+            document.getElementById('cameras-config-tbody').innerHTML = html;
+        }
+
+        function addCameraConfig() {
+            let num = document.getElementById('new-cam-num').value;
+            let name = document.getElementById('new-cam-name').value;
+            let sector = document.getElementById('new-cam-sector').value;
+            if(!num || !name) return alert('Complete el número y nombre de la cámara.');
+            let cams = getCameras();
+            cams.push({ id: num, name, sector: sector || 'General' });
+            localStorage.setItem(getDataKey('cameras'), JSON.stringify(cams));
+            document.getElementById('new-cam-num').value = '';
+            document.getElementById('new-cam-name').value = '';
+            document.getElementById('new-cam-sector').value = '';
+            renderCamerasConfig();
+        }
+
+        function delCam(i) {
+            let cams = getCameras();
+            cams.splice(i, 1);
+            localStorage.setItem(getDataKey('cameras'), JSON.stringify(cams));
+            renderCamerasConfig();
+        }
+
+        function renderUsersTable() {
+            if(loggedUserSession.role !== 'Jefe de Seguridad') return;
+            let html = '';
+            systemUsers.forEach((u, i) => {
+                let deleteBtn = (u.user === 'santiago.moyano') ? `<span class="text-slate-400 text-xs">Protegido</span>` : `<button onclick="delUser(${i})" class="text-rose-600 font-medium">Eliminar</button>`;
+                html += `<tr>
+                    <td class="p-3 font-semibold">${u.user}</td>
+                    <td class="p-3">${u.name}</td>
+                    <td class="p-3"><span class="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded font-bold">${u.role}</span></td>
+                    <td class="p-3 text-xs text-slate-600">${u.plants.join(', ')}</td>
+                    <td class="p-3 text-right">${deleteBtn}</td>
+                </tr>`;
+            });
+            document.getElementById('users-tbody').innerHTML = html;
+        }
+
+        function saveNewUser(e) {
+            e.preventDefault();
+            if(loggedUserSession.role !== 'Jefe de Seguridad') return;
+            let name = document.getElementById('new-user-name').value;
+            let user = document.getElementById('new-user-login').value.trim().toLowerCase();
+            let role = document.getElementById('new-user-role').value;
+            
+            let selectedPlants = [];
+            document.querySelectorAll('input[name="new-plant-chk"]:checked').forEach(chk => {
+                selectedPlants.push(chk.value);
+            });
+
+            if(selectedPlants.length === 0) return alert('Debe seleccionar al menos una base autorizada.');
+
+            systemUsers.push({ user, pass: 'demo12345', name, role, plants: selectedPlants, mustChangePass: true });
+            localStorage.setItem('bagley_sys_users', JSON.stringify(systemUsers));
+            closeModal('user-create-modal');
+            renderUsersTable();
+            alert(`Usuario ${name} creado con éxito. Clave inicial: demo12345`);
+        }
+
+        function delUser(i) {
+            if(loggedUserSession.role !== 'Jefe de Seguridad') return;
+            systemUsers.splice(i, 1);
+            localStorage.setItem('bagley_sys_users', JSON.stringify(systemUsers));
+            renderUsersTable();
+        }
+    </script>
+</body>
+</html>
