@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seguridad Patrimonial - Operativa</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- jsPDF for PDF Exports -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col">
+
+    <!-- CONTENEDOR DE LA APLICACIÓN -->
+    <div id="app" class="flex-1 flex flex-col">
+        <!-- VISTAS SE INYECTAN DINÁMICAMENTE -->
+    </div>
+
+    <!-- SCRIPT DE LÓGICA Y FUNCIONALIDAD COMPLETA -->
+    <script>
+        // --- BASE DE DATOS LOCAL INICIAL ---
+        const DEFAULT_PLANTS = [
+            { id: 'bagley_totoral', name: 'Bagley Totoral', admin: 'Moyano Santiago Ivan' },
+            { id: 'cartocor_totoral', name: 'Cartocor Totoral', admin: 'Moyano Santiago Ivan' },
+            { id: 'arcor_caroya', name: 'Arcor Caroya', admin: 'Yamila Soledad Jaime' },
+            { id: 'bagley_cordoba', name: 'Bagley Cordoba', admin: 'Sabrina Emilce Santillan' },
+            { id: 'edificio_chacabuco', name: 'Edificio Chacabuco', admin: 'Hector Fabian Maldonado' }
+        ];
+
+        const DEFAULT_USERS = [
+            // Administradores
+            { username: 'moyano', pass: 'Admin123*', name: 'Moyano Santiago Ivan', role: 'jefe_equipo', plant: 'bagley_totoral', mustChangePass: true },
+            { username: 'cartocor_admin', pass: 'Admin123*', name: 'Moyano Santiago Ivan', role: 'jefe_equipo', plant: 'cartocor_totoral', mustChangePass: true },
+            { username: 'yamila', pass: 'Admin123*', name: 'Yamila Soledad Jaime', role: 'jefe_equipo', plant: 'arcor_caroya', mustChangePass: true },
+            { username: 'sabrina', pass: 'Admin123*', name: 'Sabrina Emilce Santillan', role: 'jefe_equipo', plant: 'bagley_cordoba', mustChangePass: true },
+            { username: 'hector', pass: 'Admin123*', name: 'Hector Fabian Maldonado', role: 'jefe_equipo', plant: 'edificio_chacabuco', mustChangePass: true },
+            // Operadores de prueba
+            { username: 'vigilador1', pass: '1234', name: 'Juan Perez', role: 'vigilador', plant: 'bagley_totoral', mustChangePass: false },
+            { username: 'encargado1', pass: '1234', name: 'Carlos Gomez', role: 'encargado_turno', plant: 'bagley_totoral', mustChangePass: false },
+            { username: 'observador', pass: '1234', name: 'Gerencia Seguridad', role: 'jefe_seguridad', plant: 'bagley_totoral', mustChangePass: false }
+        ];
+
+        // Inicializar LocalStorage si no existe
+        function initStorage() {
+            if (!localStorage.getItem('sp_plants')) localStorage.setItem('sp_plants', JSON.stringify(DEFAULT_PLANTS));
+            if (!localStorage.getItem('sp_users')) localStorage.setItem('sp_users', JSON.stringify(DEFAULT_USERS));
+            if (!localStorage.getItem('sp_current_user')) localStorage.setItem('sp_current_user', null);
+            if (!localStorage.getItem('sp_selected_plant')) localStorage.setItem('sp_selected_plant', null);
+            
+            // Módulos base vacíos
+            const tables = ['rondas', 'novedades', 'vehiculos', 'cctv', 'correspondencia', 'cofres', 'autos_planta', 'llaves', 'procedimientos', 'cortacandados', 'notebooks', 'precintos', 'horarios', 'transportes'];
+            tables.forEach(t => {
+                if (!localStorage.getItem('sp_' + t)) localStorage.setItem('sp_' + t, JSON.stringify([]));
+            });
+        }
+        initStorage();
+
+        // --- ESTADO GLOBAL ---
+        let currentUser = JSON.parse(localStorage.getItem('sp_current_user'));
+        let selectedPlant = localStorage.getItem('sp_selected_plant');
+        let currentModule = 'rondas';
+
+        // --- RENDERIZADO PRINCIPAL ---
+        function render() {
+            const app = document.getElementById('app');
+            currentUser = JSON.parse(localStorage.getItem('sp_current_user'));
+            selectedPlant = localStorage.getItem('sp_selected_plant');
+
+            if (!currentUser) {
+                app.innerHTML = renderLogin();
+            } else if (currentUser.mustChangePass) {
+                app.innerHTML = renderChangePassword();
+            } else if (!selectedPlant) {
+                app.innerHTML = renderPlantSelector();
+            } else {
+                app.innerHTML = renderDashboard();
+                initModuleLogic();
+            }
+        }
+
+        // --- 1. PANTALLA DE LOGIN ---
+        function renderLogin() {
+            return `
+                <div class="flex-1 flex items-center justify-center p-4 bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950">
+                    <div class="bg-slate-800 border border-slate-700 p-8 rounded-2xl shadow-2xl w-full max-w-md">
+                        <div class="text-center mb-6">
+                            <div class="inline-flex p-3 bg-indigo-600/20 text-indigo-400 rounded-xl text-3xl mb-3">
+                                <i class="fa-solid fa-shield-halved"></i>
+                            </div>
+                            <h1 class="text-2xl font-bold text-white">Seguridad Patrimonial</h1>
+                            <p class="text-sm text-slate-400 mt-1">Ingrese sus credenciales operativas</p>
+                        </div>
+                        <form onsubmit="handleLogin(event)" class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Usuario / Legajo</label>
+                                <input type="text" id="login_user" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Contraseña</label>
+                                <input type="password" id="login_pass" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500">
+                            </div>
+                            <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3 rounded-lg transition shadow-lg shadow-indigo-600/30">
+                                Iniciar Sesión
+                            </button>
+                        </form>
+                        <div class="mt-6 pt-6 border-t border-slate-700/60 text-xs text-slate-400 text-center">
+                            <p class="font-medium text-slate-300 mb-1">Admin por defecto:</p>
+                            <p>Usuario: <span class="text-indigo-400 font-mono">moyano</span> | Clave: <span class="text-indigo-400 font-mono">Admin123*</span></p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function handleLogin(e) {
+            e.preventDefault();
+            const u = document.getElementById('login_user').value.trim();
+            const p = document.getElementById('login_pass').value;
+            const users = JSON.parse(localStorage.getItem('sp_users'));
+            const found = users.find(x => x.username === u && x.pass === p);
+
+            if (found) {
+                localStorage.setItem('sp_current_user', JSON.stringify(found));
+                render();
+            } else {
+                alert('Usuario o contraseña incorrectos.');
+            }
+        }
+
+        // --- 2. CAMBIO DE CONTRASEÑA OBLIGATORIO ---
+        function renderChangePassword() {
+            return `
+                <div class="flex-1 flex items-center justify-center p-4 bg-slate-900">
+                    <div class="bg-slate-800 border border-slate-700 p-8 rounded-2xl shadow-2xl w-full max-w-md">
+                        <div class="text-center mb-6">
+                            <div class="inline-flex p-3 bg-amber-500/20 text-amber-400 rounded-xl text-3xl mb-3">
+                                <i class="fa-solid fa-key"></i>
+                            </div>
+                            <h2 class="text-xl font-bold text-white">Cambio de Contraseña Requerido</h2>
+                            <p class="text-xs text-slate-400 mt-1">Por seguridad, debe actualizar su contraseña temporal.</p>
+                        </div>
+                        <form onsubmit="handlePasswordChange(event)" class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Nueva Contraseña</label>
+                                <input type="password" id="new_pass" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500">
+                            </div>
+                            <button type="submit" class="w-full bg-amber-600 hover:bg-amber-500 text-white font-semibold py-3 rounded-lg transition shadow-lg">
+                                Actualizar y Continuar
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            `;
+        }
+
+        function handlePasswordChange(e) {
+            e.preventDefault();
+            const np = document.getElementById('new_pass').value;
+            if (np.length < 4) {
+                alert('La contraseña debe tener al menos 4 caracteres.');
+                return;
+            }
+            currentUser.pass = np;
+            currentUser.mustChangePass = false;
+
+            // Actualizar en users list
+            let users = JSON.parse(localStorage.getItem('sp_users'));
+            users = users.map(u => u.username === currentUser.username ? currentUser : u);
+            localStorage.setItem('sp_users', JSON.stringify(users));
+            localStorage.setItem('sp_current_user', JSON.stringify(currentUser));
+            render();
+        }
+
+        // --- 3. SELECCIÓN DE PLANTA ---
+        function renderPlantSelector() {
+            const plants = JSON.parse(localStorage.getItem('sp_plants'));
+            return `
+                <div class="flex-1 flex items-center justify-center p-6 bg-slate-900">
+                    <div class="max-w-2xl w-full">
+                        <div class="text-center mb-8">
+                            <h1 class="text-2xl font-bold text-white mb-2">Seleccione Planta de Operación</h1>
+                            <p class="text-slate-400 text-sm">Elija la instalación en la cual realizará el turno activo.</p>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            ${plants.map(p => `
+                                <button onclick="selectPlant('${p.id}')" class="bg-slate-800 hover:bg-indigo-900/40 border border-slate-700 hover:border-indigo-500 p-5 rounded-xl text-left transition flex items-center justify-between group">
+                                    <div>
+                                        <h3 class="font-bold text-white group-hover:text-indigo-400 text-lg">${p.name}</h3>
+                                        <p class="text-xs text-slate-400 mt-1">Adm: ${p.admin}</p>
+                                    </div>
+                                    <i class="fa-solid fa-chevron-right text-slate-500 group-hover:text-indigo-400 transition"></i>
+                                </button>
+                            `).join('')}
+                        </div>
+                        <div class="mt-8 text-center">
+                            <button onclick="logout()" class="text-sm text-rose-400 hover:underline"><i class="fa-solid fa-right-from-bracket mr-1"></i> Cerrar Sesión</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function selectPlant(id) {
+            localStorage.setItem('sp_selected_plant', id);
+            render();
+        }
+
+        function logout() {
+            localStorage.removeItem('sp_current_user');
+            localStorage.removeItem('sp_selected_plant');
+            render();
+        }
+
+        // --- 4. DASHBOARD PRINCIPAL Y MÓDULOS ---
+        function renderDashboard() {
+            const plants = JSON.parse(localStorage.getItem('sp_plants'));
+            const plantObj = plants.find(p => p.id === selectedPlant);
+
+            return `
+                <div class="flex h-screen overflow-hidden">
+                    <!-- SIDEBAR -->
+                    <aside class="w-64 bg-slate-800 border-r border-slate-700 flex flex-col">
+                        <div class="p-5 border-b border-slate-700 flex items-center justify-between">
+                            <div>
+                                <h2 class="font-bold text-white text-sm truncate">${plantObj ? plantObj.name : 'Planta'}</h2>
+                                <p class="text-xs text-indigo-400 mt-0.5 capitalize">${currentUser.role.replace('_', ' ')}</p>
+                            </div>
+                            <button onclick="changePlant()" title="Cambiar Planta" class="text-slate-400 hover:text-white text-xs bg-slate-700 p-2 rounded-lg">
+                                <i class="fa-solid fa-exchange"></i>
+                            </button>
+                        </div>
+                        <nav class="flex-1 overflow-y-auto p-3 space-y-1 text-xs">
+                            <div class="text-slate-400 font-semibold px-3 py-1 uppercase tracking-wider text-[10px]">Operativa Principal</div>
+                            <a onclick="setModule('rondas')" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-700/50 cursor-pointer ${currentModule==='rondas'?'bg-indigo-600 text-white font-semibold':''}"><i class="fa-solid fa-route w-5 text-center"></i> Rondas & Checklist</a>
+                            <a onclick="setModule('novedades')" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-700/50 cursor-pointer ${currentModule==='novedades'?'bg-indigo-600 text-white font-semibold':''}"><i class="fa-solid fa-triangle-exclamation w-5 text-center"></i> Novedades</a>
+                            <a onclick="setModule('vehiculos')" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-700/50 cursor-pointer ${currentModule==='vehiculos'?'bg-indigo-600 text-white font-semibold':''}"><i class="fa-solid fa-truck-ramp-box w-5 text-center"></i> Acceso Vehicular</a>
+                            <a onclick="setModule('transporte')" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-700/50 cursor-pointer ${currentModule==='transporte'?'bg-indigo-600 text-white font-semibold':''}"><i class="fa-solid fa-truck-fast w-5 text-center"></i> Novedades Transportes</a>
+                            
+                            <div class="text-slate-400 font-semibold px-3 pt-3 pb-1 uppercase tracking-wider text-[10px]">Controles y Registros</div>
+                            <a onclick="setModule('cctv')" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg
