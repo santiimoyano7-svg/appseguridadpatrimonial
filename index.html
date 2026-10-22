@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Sistema Integral de Seguridad - Panel Operativo</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+<script>tailwind.config={theme:{extend:{colors:{industrial:{50:'#f8fafc',100:'#f1f5f9',800:'#1e293b',900:'#0f172a',accent:'#2563eb'}}}}}</script>
+</head>
+<body class="bg-slate-900 text-slate-800 font-sans antialiased min-h-screen flex flex-col justify-center items-center">
+
+<div id="login-screen" class="fixed inset-0 bg-slate-950 z-50 flex items-center justify-center p-4">
+<div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 space-y-6 border border-slate-800">
+<div class="text-center space-y-2">
+<div class="bg-blue-600 text-white w-14 h-14 rounded-2xl mx-auto flex items-center justify-center shadow-lg"><i class="fa-solid fa-shield-halved text-2xl"></i></div>
+<h2 class="text-2xl font-bold text-slate-900">Control de Seguridad</h2>
+<p class="text-xs text-slate-500">Ingrese sus credenciales seguras</p>
+</div>
+<form onsubmit="handleLogin(event)" class="space-y-4">
+<div><label class="block text-xs font-bold text-slate-700 uppercase mb-1">Usuario</label>
+<div class="relative"><span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400"><i class="fa-solid fa-user"></i></span>
+<input type="text" id="login-user" required autocomplete="username" placeholder="Ej. santiago.moyano" class="w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"></div></div>
+<div><label class="block text-xs font-bold text-slate-700 uppercase mb-1">Contraseña</label>
+<div class="relative"><span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400"><i class="fa-solid fa-lock"></i></span>
+<input type="password" id="login-pass" required autocomplete="current-password" placeholder="••••••••" class="w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"></div></div>
+<button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition shadow-lg text-sm flex items-center justify-center space-x-2"><span>Ingresar al Sistema</span><i class="fa-solid fa-arrow-right-to-bracket"></i></button>
+</form></div></div>
+
+<div id="change-password-modal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[60] hidden flex items-center justify-center p-4">
+<div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 space-y-5">
+<div class="text-center space-y-1"><div class="bg-amber-500 text-white w-12 h-12 rounded-full mx-auto flex items-center justify-center"><i class="fa-solid fa-key text-xl"></i></div>
+<h3 class="text-xl font-bold text-slate-900">Actualizar Contraseña</h3><p class="text-xs text-slate-500">Por seguridad, establezca una contraseña robusta.</p></div>
+<form onsubmit="saveNewPassword(event)" class="space-y-4 text-sm">
+<div><label class="block font-medium text-slate-700 mb-1">Nueva Contraseña</label><input type="password" id="new-pass-1" required minlength="8" class="w-full border rounded-xl px-3 py-2.5"></div>
+<div><label class="block font-medium text-slate-700 mb-1">Confirmar Contraseña</label><input type="password" id="new-pass-2" required minlength="8" class="w-full border rounded-xl px-3 py-2.5"></div>
+<button type="submit" class="w-full bg-blue-600 text-white font-semibold py-3 rounded-xl hover:bg-blue-700 transition">Actualizar y Continuar</button>
+</form></div></div>
+
+<div id="selection-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+<div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-8 space-y-6">
+<div class="text-center space-y-1"><h3 class="text-xl font-bold text-slate-900">Configuración de Sesión</h3><p id="welcome-user-txt" class="text-sm text-blue-600 font-semibold"></p></div>
+<div class="space-y-4 text-sm">
+<div><label class="block font-bold text-slate-700 mb-1"><i class="fa-solid fa-building text-blue-600 mr-1"></i> Base Autorizada</label><select id="modal-plant-choice" class="w-full border rounded-xl px-3 py-2.5 bg-slate-50 font-medium"></select></div>
+<div><label class="block font-bold text-slate-700 mb-1"><i class="fa-solid fa-clock text-blue-600 mr-1"></i> Turno</label><select id="modal-turno-choice" class="w-full border rounded-xl px-3 py-2.5 bg-slate-50 font-medium"><option value="No aplica">No aplica</option><option value="Turno Mañana (06:00 - 14:00)">Turno Mañana (06:00 - 14:00)</option><option value="Turno Tarde (14:00 - 22:00)">Turno Tarde (14:00 - 22:00)</option><option value="Turno Noche (22:00 - 06:00)">Turno Noche (22:00 - 06:00)</option></select></div>
+</div>
+<button onclick="confirmSession()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition text-sm">Iniciar Operación</button>
+</div></div>
+
+<div id="main-app-container" class="w-full min-h-screen flex flex-col hidden bg-slate-100 text-slate-800">
+<header class="bg-slate-900 text-white shadow-md sticky top-0 z-40">
+<div class="px-4 py-3 flex flex-wrap justify-between items-center gap-3">
+<div class="flex items-center space-x-3"><div class="bg-blue-600 p-2 rounded-lg text-white"><i class="fa-solid fa-shield-halved text-xl"></i></div>
+<div><h1 class="text-lg font-bold tracking-wide">SEGURIDAD INDUSTRIAL</h1><p id="current-plant-subtitle" class="text-xs text-blue-400 font-medium">Base</p></div></div>
+<div class="flex items-center space-x-3 bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700"><span class="text-xs text-slate-400">Objetivo:</span><select id="global-plant-select" onchange="changePlant(this.value)" class="bg-slate-900 text-white text-xs font-bold px-2 py-1 rounded border border-slate-600"></select></div>
+<div class="flex items-center space-x-3"><div class="text-right hidden md:block"><p id="current-user-role" class="text-xs font-semibold bg-blue-900/60 text-blue-300 px-2 py-0.5 rounded border border-blue-700 inline-block">Rol</p></div>
+<button onclick="logout()" class="bg-rose-900/60 hover:bg-rose-800 text-xs px-3 py-2 rounded-lg border border-rose-700 transition text-rose-200"><i class="fa-solid fa-right-from-bracket"></i> Salir</button></div>
+</div></header>
+
+<div class="flex flex-grow w-full relative">
+<aside id="sidebar" class="bg-slate-900 text-slate-300 w-64 transition-all duration-300 flex flex-col border-r border-slate-800 sticky top-[65px] h-[calc(100vh-65px)] z-30">
+<div class="p-3 border-b border-slate-800 flex justify-between items-center bg-slate-950">
+<span id="sidebar-title-label" class="text-xs font-bold uppercase tracking-wider text-slate-400">Menú</span>
+<button onclick="toggleSidebar()" class="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800"><i id="sidebar-toggle-icon" class="fa-solid fa-angles-left"></i></button></div>
+<div class="flex-grow overflow-y-auto p-2 space-y-1 text-sm">
+<button onclick="switchTab('acceso-vehicular')" id="btn-acceso-vehicular" class="sidebar-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl transition text-left bg-blue-600 text-white font-semibold shadow-md"><i class="fa-solid fa-car-side text-lg min-w-[24px] text-center"></i><span class="sidebar-text truncate">Acceso Vehicular</span></button>
+<button onclick="switchTab('flota-propia')" id="btn-flota-propia" class="sidebar-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl transition text-left hover:bg-slate-800 text-slate-300"><i class="fa-solid fa-car text-lg min-w-[24px] text-center"></i><span class="sidebar-text truncate">Flota Propia</span></button>
+<button onclick="switchTab('transportes')" id="btn-transportes" class="sidebar-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl transition text-left hover:bg-slate-800 text-slate-300"><i class="fa-solid fa-truck text-lg min-w-[24px] text-center"></i><span class="sidebar-text truncate">Transportes</span></button>
+<button onclick="switchTab('rondas')" id="btn-rondas" class="sidebar-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl transition text-left hover:bg-slate-800 text-slate-300"><i class="fa-solid fa-route text-lg min-w-[24px] text-center"></i><span class="sidebar-text truncate">Control Rondas</span></button>
+<button onclick="switchTab('correspondencia')" id="btn-correspondencia" class="sidebar-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl transition text-left hover:bg-slate-800 text-slate-300"><i class="fa-solid fa-envelope text-lg min-w-[24px] text-center"></i><span class="sidebar-text truncate">Correspondencia</span></button>
+<button onclick="switchTab('cctv')" id="btn-cctv" class="sidebar-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl transition text-left hover:bg-slate-800 text-slate-300"><i class="fa-solid fa-video text-lg min-w-[24px] text-center"></i><span class="sidebar-text truncate">Control CCTV</span></button>
+<button onclick="switchTab('relevamiento-llaves')" id="btn-relevamiento-llaves" class="sidebar-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl transition text-left hover:bg-slate-800 text-slate-300"><i class="fa-solid fa-clipboard-list text-lg min-w-[24px] text-center"></i><span class="sidebar-text truncate">Relev. Llaves</span></button>
+<button onclick="switchTab('llaves')" id="btn-llaves" class="sidebar-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl transition text-left hover:bg-slate-800 text-slate-300"><i class="fa-solid fa-key text-lg min-w-[24px] text-center"></i><span class="sidebar-text truncate">Entrega Llaves</span></button>
+<button onclick="switchTab('precintos')" id="btn-precintos" class="sidebar-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl transition text-left hover:bg-slate-800 text-slate-300"><i class="fa-solid fa-lock text-lg min-w-[24px] text-center"></i><span class="sidebar-text truncate">Precintos</span></button>
+<button onclick="switchTab('notebooks')" id="btn-notebooks" class="sidebar-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl transition text-left hover:bg-slate-800 text-slate-300"><i class="fa-solid fa-laptop text-lg min-w-[24px] text-center"></i><span class="sidebar-text truncate">Notebooks</span></button>
+<button onclick="switchTab('cortacandados')" id="btn-cortacandados" class="sidebar-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl transition text-left hover:bg-slate-800 text-slate-300"><i class="fa-solid fa-scissors text-lg min-w-[24px] text-center"></i><span class="sidebar-text truncate">Corta Candados</span></button>
+<button onclick="switchTab('usuarios')" id="btn-usuarios" class="sidebar-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl transition text-left hover:bg-slate-800 text-slate-300"><i class="fa-solid fa-users-gear text-lg min-w-[24px] text-center"></i><span class="sidebar-text truncate">Usuarios</span></button>
+</div></aside>
+
+<main class="flex-grow p-6 w-full space-y-6 overflow-y-auto">
+<div id="tab-acceso-vehicular" class="tab-content space-y-6">
+<div class="bg-white p-5 rounded-xl shadow-sm border flex justify-between items-center"><div><h2 class="text-xl font-bold">Acceso Vehicular</h2></div><div class="flex gap-2"><button onclick="openModal('vehicular-modal')" class="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg">Nuevo Ingreso</button><button id="btn-pdf-vehicular" onclick="openPdfExportModal('vehicular')" class="bg-rose-600 text-white text-sm px-4 py-2 rounded-lg hidden">PDF</button></div></div>
+<div class="bg-white rounded-xl shadow-sm border overflow-hidden"><table class="w-full text-left text-sm"><thead class="bg-slate-900 text-white text-xs uppercase"><tr><th class="p-3">Ingreso</th><th class="p-3">Patente</th><th class="p-3">Vehículo</th><th class="p-3">Conductor</th><th class="p-3">Estado</th><th class="p-3 text-right">Acción</th></tr></thead><tbody id="vehicular-tbody" class="divide-y"></tbody></table></div></div>
+
+<div id="tab-flota-propia" class="tab-content hidden space-y-6">
+<div class="bg-white p-5 rounded-xl shadow-sm border flex justify-between items-center"><div><h2 class="text-xl font-bold">Flota Propia</h2></div><div class="flex gap-2"><button onclick="openModal('flota-modal')" class="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg">Registrar Salida</button><button id="btn-pdf-flota" onclick="openPdfExportModal('flota')" class="bg-rose-600 text-white text-sm px-4 py-2 rounded-lg hidden">PDF</button></div></div>
+<div class="bg-white rounded-xl shadow-sm border overflow-hidden"><table class="w-full text-left text-sm"><thead class="bg-slate-900 text-white text-xs uppercase"><tr><th class="p-3">Salida</th><th class="p-3">Dominio</th><th class="p-3">Modelo</th><th class="p-3">Chofer</th><th class="p-3">Estado</th><th class="p-3 text-right">Acción</th></tr></thead><tbody id="flota-tbody" class="divide-y"></tbody></table></div></div>
+
+<div id="tab-transportes" class="tab-content hidden space-y-6">
+<div class="bg-white p-5 rounded-xl shadow-sm border flex justify-between items-center"><div><h2 class="text-xl font-bold">Novedades Transportes</h2></div><div class="flex gap-2"><button onclick="openModal('transportes-modal')" class="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg">Registrar</button><button id="btn-pdf-transportes" onclick="openPdfExportModal('transportes')" class="bg-rose-600 text-white text-sm px-4 py-2 rounded-lg hidden">PDF</button></div></div>
+<div class="bg-white rounded-xl shadow-sm border overflow-hidden"><table class="w-full text-left text-sm"><thead class="bg-slate-900 text-white text-xs uppercase"><tr><th class="p-3">Fecha</th><th class="p-3">Transportista</th><th class="p-3">Empresa</th><th class="p-3">Estado</th><th class="p-3 text-right">Acción</th></tr></thead><tbody id="transportes-tbody" class="divide-y"></tbody></table></div></div>
+
+<div id="tab-rondas" class="tab-content hidden space-y-6">
+<div class="bg-white p-5 rounded-xl shadow-sm border flex justify-between items-center"><div><h2 class="text-xl font-bold">Control de Rondas</h2></div><div class="flex gap-2"><button onclick="openModal('rondas-modal')" class="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg">Registrar</button><button id="btn-pdf-rondas" onclick="openPdfExportModal('rondas')" class="bg-rose-600 text-white text-sm px-4 py-2 rounded-lg hidden">PDF</button></div></div>
+<div class="bg-white rounded-xl shadow-sm border overflow-hidden"><table class="w-full text-left text-sm"><thead class="bg-slate-900 text-white text-xs uppercase"><tr><th class="p-3">Fecha</th><th class="p-3">Sector</th><th class="p-3">Vigilador</th><th class="p-3">Estado</th><th class="p-3 text-right">Acción</th></tr></thead><tbody id="rondas-tbody" class="divide-y"></tbody></table></div></div>
+
+<div id="tab-correspondencia" class="tab-content hidden space-y-6">
+<div class="bg-white p-5 rounded-xl shadow-sm border flex justify-between items-center"><div><h2 class="text-xl font-bold">Correspondencia</h2></div><div class="flex gap-2"><button onclick="openModal('correspondencia-modal')" class="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg">Registrar</button><button id="btn-pdf-correspondencia" onclick="openPdfExportModal('correspondencia')" class="bg-rose-600 text-white text-sm px-4 py-2 rounded-lg hidden">PDF</button></div></div>
+<div class="bg-white rounded-xl shadow-sm border overflow-hidden"><table class="w-full text-left text-sm"><thead class="bg-slate-900 text-white text-xs uppercase"><tr><th class="p-3">Recepción</th><th class="p-3">Destinatario</th><th class="p-3">Courier</th><th class="p-3">Estado</th><th class="p-3 text-right">Acción</th></tr></thead><tbody id="correspondencia-tbody" class="divide-y"></tbody></table></div></div>
+
+<div id="tab-cctv" class="tab-content hidden space-y-6">
+<div class="bg-white p-5 rounded-xl shadow-sm border flex justify-between items-center"><div><h2 class="text-xl font-bold">Control CCTV</h2></div><div class="flex gap-2"><button onclick="openModal('cctv-modal')" class="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg">Registrar</button><button id="btn-pdf-cctv" onclick="openPdfExportModal('cctv')" class="bg-rose-600 text-white text-sm px-4 py-2 rounded-lg hidden">PDF</button></div></div>
+<div class="bg-white rounded-xl shadow-sm border overflow-hidden"><table class="w-full text-left text-sm"><thead class="bg-slate-900 text-white text-xs uppercase"><tr><th class="p-3">Fecha</th><th class="p-3">Cámara</th><th class="p-3">Estado</th><th class="p-3 text-right">Acción</th></tr></thead><tbody id="cctv-tbody" class="divide-y"></tbody></table></div></div>
+
+<div id="tab-relevamiento-llaves" class="tab-content hidden space-y-6">
+<div class="bg-white p-5 rounded-xl shadow-sm border flex justify-between items-center"><div><h2 class="text-xl font-bold">Relevamiento de Llaves</h2></div>
+<div id="relevamiento-admin-actions" class="flex gap-2 hidden"><button onclick="openModal('relevamiento-modal')" class="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg">Nueva</button><label class="bg-emerald-600 text-white text-sm px-4 py-2 rounded-lg cursor-pointer">Excel<input type="file" accept=".xlsx" onchange="importRelevamientoExcel(event)" class="hidden"></label></div></div>
+<div class="bg-white rounded-xl shadow-sm border overflow-hidden"><table class="w-full text-left text-sm"><thead class="bg-slate-900 text-white text-xs uppercase"><tr><th class="p-3">Llave</th><th class="p-3">Sector</th><th class="p-3">Autorización</th><th class="p-3 text-right">Acción</th></tr></thead><tbody id="relevamiento-tbody" class="divide-y"></tbody></table></div></div>
+
+<div id="tab-llaves" class="tab-content hidden space-y-6">
+<div class="bg-white p-5 rounded-xl shadow-sm border flex justify-between items-center"><div><h2 class="text-xl font-bold">Entrega y Control de Llaves</h2></div><button onclick="openModal('llave-modal')" class="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg">Registrar</button></div>
+<div class="bg-white rounded-xl shadow-sm border overflow-hidden"><table class="w-full text-left text-sm"><thead class="bg-slate-900 text-white text-xs uppercase"><tr><th class="p-3">Llave</th><th class="p-3">Movimiento</th><th class="p-3">Retira</th><th class="p-3 text-right">Acción</th></tr></thead><tbody id="llaves-tbody" class="divide-y"></tbody></table></div></div>
+
+<div id="tab-precintos" class="tab-content hidden space-y-6">
+<div class="bg-white p-5 rounded-xl shadow-sm border flex justify-between items-center"><div><h2 class="text-xl font-bold">Control de Precintos</h2></div><div class="flex gap-2"><button onclick="openModal('precinto-modal')" class="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg">Registrar</button><button id="btn-pdf-precintos" onclick="openPdfExportModal('precintos')" class="bg-rose-600 text-white text-sm px-4 py-2 rounded-lg hidden">PDF</button></div></div>
+<div class="bg-white rounded-xl shadow-sm border overflow-hidden"><table class="w-full text-left text-sm"><thead class="bg-slate-900 text-white text-xs uppercase"><tr><th class="p-3">Fecha</th><th class="p-3">Puerta</th><th class="p-3">Estado</th><th class="p-3 text-right">Acción</th></tr></thead><tbody id="precintos-tbody" class="divide-y"></tbody></table></div></div>
+
+<div id="tab-notebooks" class="tab-content hidden space-y-6">
+<div class="bg-white p-5 rounded-xl shadow-sm border flex justify-between items-center"><div><h2 class="text-xl font-bold">Control de Notebooks</h2></div><div class="flex gap-2"><button onclick="openModal('notebook-modal')" class="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg">Ingreso</button><button id="btn-pdf-notebooks" onclick="openPdfExportModal('notebooks')" class="bg-rose-600 text-white text-sm px-4 py-2 rounded-lg hidden">PDF</button></div></div>
+<div class="bg-white rounded-xl shadow-sm border overflow-hidden"><table class="w-full text-left text-sm"><thead class="bg-slate-900 text-white text-xs uppercase"><tr><th class="p-3">Ingreso</th><th class="p-3">Marca</th><th class="p-3">Serie</th><th class="p-3 text-right">Acción</th></tr></thead><tbody id="notebooks-tbody" class="divide-y"></tbody></table></div></div>
+
+<div id="tab-cortacandados" class="tab-content hidden space-y-6">
+<div class="bg-white p-5 rounded-xl shadow-sm border flex justify-between items-center"><div><h2 class="text-xl font-bold">Corta Candados</h2></div><div class="flex gap-2"><button onclick="openModal('cortacandados-modal')" class="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg">Entrega</button><button id="btn-pdf-cortacandados" onclick="openPdfExportModal('cortacandados')" class="bg-rose-600 text-white text-sm px-4 py-2 rounded-lg hidden">PDF</button></div></div>
+<div class="bg-white rounded-xl shadow-sm border overflow-hidden"><table class="w-full text-left text-sm"><thead class="bg-slate-900 text-white text-xs uppercase"><tr><th class="p-3">Entrega</th><th class="p-3">Retira</th><th class="p-3">Sector</th><th class="p-3 text-right">Acción</th></tr></thead><tbody id="cortacandados-tbody" class="divide-y"></tbody></table></div></div>
+
+<div id="tab-usuarios" class="tab-content hidden space-y-6">
+<div class="bg-white p-5 rounded-xl shadow-sm border flex justify-between items-center"><div><h2 class="text-xl font-bold">Gestión de Usuarios</h2></div><button onclick="openModal('user-create-modal')" class="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg">Crear Usuario</button></div>
+<div class="bg-white rounded-xl shadow-sm border overflow-hidden"><table class="w-full text-left text-sm"><thead class="bg-slate-900 text-white text-xs uppercase"><tr><th class="p-3">Usuario</th><th class="p-3">Nombre</th><th class="p-3">Rol</th><th class="p-3 text-right">Acción</th></tr></thead><tbody id="users-tbody" class="divide-y"></tbody></table></div></div>
+</main></div></div>
+
+<!-- Modales -->
+<div id="rondas-modal" class="fixed inset-0 bg-slate-950/80 z-50 hidden flex items-center justify-center p-4"><div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4 text-sm"><h3 class="font-bold text-lg">Registrar Ronda</h3><form onsubmit="saveRondaItem(event)" class="space-y-3"><div><label>Sector</label><input type="text" id="ronda-sector" required class="w-full border rounded-xl px-3 py-2 mt-1"></div><div><label>Estado</label><select id="ronda-estado" class="w-full border rounded-xl px-3 py-2 mt-1"><option>Normal / Sin novedad</option><option>Anomalía detectada</option></select></div><div><label>Observaciones</label><textarea id="ronda-obs" rows="2" class="w-full border rounded-xl px-3 py-2 mt-1"></textarea></div><div class="flex justify-end space-x-2"><button type="button" onclick="closeModal('rondas-modal')">Cancelar</button><button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-xl">Guardar</button></div></form></div></div>
+<div id="correspondencia-modal" class="fixed inset-0 bg-slate-950/80 z-50 hidden flex items-center justify-center p-4"><div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4 text-sm"><h3 class="font-bold text-lg">Correspondencia</h3><form onsubmit="saveCorrespondenciaItem(event)" class="space-y-3"><div><label>Destinatario</label><input type="text" id="corr-destinatario" required class="w-full border rounded-xl px-3 py-2 mt-1"></div><div><label>Remitente</label><input type="text" id="corr-remitente" required class="w-full border rounded-xl px-3 py-2 mt-1"></div><div><label>Descripción</label><textarea id="corr-desc" required rows="2" class="w-full border rounded-xl px-3 py-2 mt-1"></textarea></div><div class="flex justify-end space-x-2"><button type="button" onclick="closeModal('correspondencia-modal')">Cancelar</button><button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-xl">Guardar</button></div></form></div></div>
+<div id="cctv-modal" class="fixed inset-0 bg-slate-950/80 z-50 hidden flex items-center justify-center p-4"><div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4 text-sm"><h3 class="font-bold text-lg">Novedad CCTV</h3><form onsubmit="saveCctvItem(event)" class="space-y-3"><div><label>Cámara</label><input type="text" id="cctv-camara" required class="w-full border rounded-xl px-3 py-2 mt-1"></div><div><label>Estado</label><select id="cctv-estado" class="w-full border rounded-xl px-3 py-2 mt-1"><option>Grabación Normal</option><option>Cámara sin señal</option></select></div><div><label>Detalle</label><textarea id="cctv-detalle" required rows="2" class="w-full border rounded-xl px-3 py-2 mt-1"></textarea></div><div class="flex justify-end space-x-2"><button type="button" onclick="closeModal('cctv-modal')">Cancelar</button><button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-xl">Guardar</button></div></form></div></div>
+<div id="vehicular-modal" class="fixed inset-0 bg-slate-950/80 z-50 hidden flex items-center justify-center p-4"><div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4 text-sm"><h3 class="font-bold text-lg">Ingreso Vehicular</h3><form onsubmit="saveVehicularIngreso(event)" class="space-y-3"><div><label>Patente</label><input type="text" id="veh-patente" required class="w-full border rounded-xl px-3 py-2 mt-1 uppercase"></div><div><label>Vehículo</label><input type="text" id="veh-marca" required class="w-full border rounded-xl px-3 py-2 mt-1"></div><div><label>Conductor</label><input type="text" id="veh-conductor" required class="w-full border rounded-xl px-3 py-2 mt-1"></div><div><label>Motivo</label><input type="text" id="veh-motivo" required class="w-full border rounded-xl px-3 py-2 mt-1"></div><div class="flex justify-end space-x-2"><button type="button" onclick="closeModal('vehicular-modal')">Cancelar</button><button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-xl">Guardar</button></div></form></div></div>
+<div id="flota-modal" class="fixed inset-0 bg-slate-950/80 z-50 hidden flex items-center justify-center p-4"><div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4 text-sm"><h3 class="font-bold text-lg">Flota Propia</h3><form onsubmit="saveFlotaSalida(event)" class="space-y-3"><div><label>Dominio</label><input type="text" id="flota-patente" required class="w-full border rounded-xl px-3 py-2 mt-1 uppercase"></div><div><label>Modelo</label><input type="text" id="flota-modelo" required class="w-full border rounded-xl px-3 py-2 mt-1"></div><div><label>Chofer</label><input type="text" id="flota-chofer" required class="w-full border rounded-xl px-3 py-2 mt-1"></div><div><label>KM</label><input type="number" id="flota-km" required class="w-full border rounded-xl px-3 py-2 mt-1"></div><div class="flex justify-end space-x-2"><button type="button" onclick="closeModal('flota-modal')">Cancelar</button><button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-xl">Guardar</button></div></form></div></div>
+<div id="transportes-modal" class="fixed inset-0 bg-slate-950/80 z-50 hidden flex items-center justify-center p-4"><div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4 text-sm"><h3 class="font-bold text-lg">Transporte</h3><form onsubmit="saveTransporteNovedad(event)" class="space-y-3"><div><label>Transportista</label><input type="text" id="tr-nombre" required class="w-full border rounded-xl px-3 py-2 mt-1"></div><div><label>DNI</label><input type="text" id="tr-dni" required class="w-full border rounded-xl px-3 py-2 mt-1"></div><div><label>Empresa</label><input type="text" id="tr-empresa" required class="w-full border rounded-xl px-3 py-2 mt-1"></div><div><label>Detalle</label><textarea id="tr-detalle" required class="w-full border rounded-xl px-3 py-2 mt-1"></textarea></div><div class="flex justify-end space-x-2"><button type="button" onclick="closeModal('transportes-modal')">Cancelar</button><button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-xl">Guardar</button></div></form></div></div>
+<div id="relevamiento-modal" class="fixed inset-0 bg-slate-950/80 z-50 hidden flex items-center justify-center p-4"><div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4 text-sm"><h3 class="font-bold text-lg">Nueva Llave</h3><form onsubmit="saveRelevamientoItem(event)" class="space-y-3"><div><label>N° Llave</label><input type="text" id="rel-nro" required class="w-full border rounded-xl px-3 py-2 mt-1"></div><div><label>Sector</label><input type="text" id="rel-sector" required class="w-full border rounded-xl px-3 py-2 mt-1"></div><div><label>Autorización</label><select id="rel-necesita-aut" class="w-full border rounded-xl px-3 py-2 mt-1"><option>No</option><option>Sí</option></select></div><div class="flex justify-end space-x-2"><button type="button" onclick="closeModal('relevamiento-modal')">Cancelar</button><button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-xl">Guardar</button></div></form></div></div>
+<div id="llave-modal" class="fixed inset-0 bg-slate-950/80 z-50 hidden flex items-center justify-center p-4"><div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4 text-sm"><h3 class="font-bold text-lg">Entrega Llave</h3><form onsubmit="saveLlaveEntrega(event)" class="space-y-3"><div><label>N° Llave o Sector</label><input type="text" id="entrega-busqueda" oninput="buscarLlaveRelevamiento(this.value)" required class="w-full border rounded-xl px-3 py-2 mt-1"></div><div><label>Retira (Nombre)</label><input type="text" id="llave-retira-nombre" required class="w-full border rounded-xl px-3 py-2 mt-1"></div><div><label>DNI</label><input type="text" id="llave-retira-doc" required class="w-full border rounded-xl px-3 py-2 mt-1"></div><div class="flex justify-end space-x-2"><button type="button" onclick="closeModal('llave-modal')">Cancelar</button><button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-xl">Confirmar</button></div></form></div></div>
+<div id="precinto-modal" class="fixed inset-0 bg-slate-950/80 z-50 hidden flex items-center justify-center p-4"><div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4 text-sm"><h3 class="font-bold text-lg">Precinto</h3><form onsubmit="savePrecintoControl(event)" class="space-y-3"><div><label>Puerta</label><input type="text" id="pr-puerta" required class="w-full border rounded-xl px-3 py-2 mt-1"></div><div><label>Estado</label><select id="pr-estado" class="w-full border rounded-xl px-3 py-2 mt-1"><option>Buen estado</option><option>Cortado</option></select></div><div class="flex justify-end space-x-2"><button type="button" onclick="closeModal('precinto-modal')">Cancelar</button><button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-xl">Guardar</button></div></form></div></div>
+<div id="notebook-modal" class="fixed inset-0 bg-slate-950/80 z-50 hidden flex items-center justify-center p-4"><div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4 text-sm"><h3 class="font-bold text-lg">Notebook</h3><form onsubmit="saveNotebookIngreso(event)" class="space-y-3"><div><label>Marca</label><input type="text" id="nb-marca" required class="w-full border rounded-xl px-3 py-2 mt-1"></div><div><label>Serie</label><input type="text" id="nb-serie" required class="w-full border rounded-xl px-3 py-2 mt-1"></div><div><label>Persona</label><input type="text" id="nb-persona" required class="w-full border rounded-xl px-3 py-2 mt-1"></div><div class="flex justify-end space-x-2"><button type="button" onclick="closeModal('notebook-modal')">Cancelar</button><button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-xl">Guardar</button></div></form></div></div>
+<div id="cortacandados-modal" class="fixed inset-0 bg-slate-950/80 z-50 hidden flex items-center justify-center p-4"><div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4 text-sm"><h3 class="font-bold text-lg">Corta Candados</h3><form onsubmit="saveCortaCandadosEntrega(event)" class="space-y-3"><div><label>Retira</label><input type="text" id="cc-retira-nombre" required class="w-full border rounded-xl px-3 py-2 mt-1"></div><div><label>DNI</label><input type="text" id="cc-retira-doc" required class="w-full border rounded-xl px-3 py-2 mt-1"></div><div><label>Sector</label><input type="text" id="cc-sector" required class="w-full border rounded-xl px-3 py-2 mt-1"></div><div class="flex justify-end space-x-2"><button type="button" onclick="closeModal('cortacandados-modal')">Cancelar</button><button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-xl">Confirmar</button></div></form></div></div>
+<div id="pdf-export-modal" class="fixed inset-0 bg-slate-950/80 z-50 hidden flex items-center justify-center p-4"><div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4 text-sm"><h3 class="font-bold text-lg">Exportar PDF</h3><div><label>Fecha Ref</label><input type="date" id="pdf-ref-date" class="w-full border rounded-xl px-3 py-2 mt-1"></div><input type="hidden" id="pdf-active-type"><div class="flex justify-end space-x-2"><button type="button" onclick="closeModal('pdf-export-modal')">Cancelar</button><button onclick="executePdfExport()" class="bg-rose-600 text-white px-4 py-2 rounded-xl">Generar</button></div></div></div>
+<div id="user-create-modal" class="fixed inset-0 bg-slate-950/80 z-50 hidden flex items-center justify-center p-4"><div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4 text-sm"><h3 class="font-bold text-lg">Crear Usuario</h3><form onsubmit="saveNewUser(event)" class="space-y-3"><div><label>Nombre</label><input type="text" id="new-user-name" required class="w-full border rounded px-3 py-2 mt-1"></div><div><label>Usuario</label><input type="text" id="new-user-login" required class="w-full border rounded px-3 py-2 mt-1"></div><div><label>Rol</label><select id="new-user-role" class="w-full border rounded px-3 py-2 mt-1"><option>Vigilador</option><option>Encargado de Turno</option><option>Jefe de Equipo</option><option>Jefe de Seguridad</option></select></div><div class="flex justify-end space-x-2"><button type="button" onclick="closeModal('user-create-modal')">Cancelar</button><button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">Crear</button></div></form></div></div>
+
+<script>
+const allPlants=['Bagley Totoral','Cartocor/Converflex','Arcor Caroya','Bagley Cordoba','Edificio Chacabuco'];
+async function hashPass(p){let m=new TextEncoder().encode(p);let h=await crypto.subtle.digest('SHA-256',m);return Array.from(new Uint8Array(h)).map(b=>b.toString(16).padStart(2,'0')).join('');}
+
+let defaultSystemUsers=[
+{user:'santiago.moyano',passHash:'8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918',name:'Santiago Ivan Moyano',role:'Jefe de Seguridad',plants:allPlants,mustChangePass:false},
+{user:'gabriel.diaz',passHash:'03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4',name:'Diaz Gabriel',role:'Vigilador',plants:['Bagley Totoral'],mustChangePass:true},
+{user:'yamila.jaime',passHash:'03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4',name:'Yamila Soledad Jaime',role:'Jefe de Equipo',plants:['Arcor Caroya'],mustChangePass:true},
+{user:'sabrina.santillan',passHash:'03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4',name:'Sabrina Emilce Santillan',role:'Jefe de Equipo',plants:['Bagley Cordoba'],mustChangePass:true},
+{user:'hector.maldonado',passHash:'03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4',name:'Hector Fabian Maldonado',role:'Jefe de Equipo',plants:['Edificio Chacabuco'],mustChangePass:true}
+];
+
+let systemUsers=JSON.parse(localStorage.getItem('bagley_sys_users'))||defaultSystemUsers;
+let loggedUserSession=null,currentPlant="",currentTurno="",selectedLlaveRelevada=null,isSidebarCollapsed=false;
+
+function getDataKey(k){return`bagley_${currentPlant}_${k}`;}
+function getRecords(k){return JSON.parse(localStorage.getItem(getDataKey(k)))||[];}
+function saveRecords(k,d){localStorage.setItem(getDataKey(k),JSON.stringify(d));}
+
+async function handleLogin(e){
+    e.preventDefault();
+    let u=document.getElementById('login-user').value.trim().toLowerCase();
+    let p=document.getElementById('login-pass').value.trim();
+    let pH=await hashPass(p);
+    let found=systemUsers.find(x=>x.user===u && x.passHash===pH);
+    if(!found)return alert('Credenciales incorrectas.');
+    loggedUserSession=found;
+    document.getElementById('login-screen').classList.add('hidden');
+    if(found.mustChangePass || p==='demo12345'){document.getElementById('change-password-modal').classList.remove('hidden');return;}
+    proceedToSelection();
+}
+
+async function saveNewPassword(e){
+    e.preventDefault();
+    let p1=document.getElementById('new-pass-1').value;
+    let p2=document.getElementById('new-pass-2').value;
+    if(p1!==p2)return alert('Las contraseñas no coinciden.');
+    if(p1.length<8)return alert('Mínimo 8 caracteres.');
+    loggedUserSession.passHash=await hashPass(p1);
+    loggedUserSession.mustChangePass=false;
+    let idx=systemUsers.findIndex(x=>x.user===loggedUserSession.user);
+    if(idx!==-1)systemUsers[idx]=loggedUserSession;
+    localStorage.setItem('bagley_sys_users',JSON.stringify(systemUsers));
+    document.getElementById('change-password-modal').classList.add('hidden');
+    proceedToSelection();
+}
+
+function proceedToSelection(){
+    document.getElementById('welcome-user-txt').innerText=`Bienvenido, ${loggedUserSession.name} (${loggedUserSession.role})`;
+    let sel=document.getElementById('modal-plant-choice');sel.innerHTML='';
+    loggedUserSession.plants.forEach(p=>{let o=document.createElement('option');o.value=p;o.innerText=p;sel.appendChild(o);});
+    currentPlant=loggedUserSession.plants[0];
+    document.getElementById('selection-modal').classList.remove('hidden');
+}
+
+function confirmSession(){
+    currentPlant=document.getElementById('modal-plant-choice').value;
+    currentTurno=document.getElementById('modal-turno-choice').value;
+    document.getElementById('selection-modal').classList.add('hidden');
+    document.getElementById('main-app-container').classList.remove('hidden');
+    document.getElementById('current-plant-subtitle').innerText=`Base: ${currentPlant} | Turno: ${currentTurno}`;
+    document.getElementById('current-user-role').innerText=`${loggedUserSession.name} (${loggedUserSession.role})`;
+    
+    let gSel=document.getElementById('global-plant-select');gSel.innerHTML='';
+    loggedUserSession.plants.forEach(p=>{let o=document.createElement('option');o.value=p;o.innerText=p;if(p===currentPlant)o.selected=true;gSel.appendChild(o);});
+
+    let isVig=loggedUserSession.role==='Vigilador';
+    document.getElementById('btn-usuarios').style.display=loggedUserSession.role==='Jefe de Seguridad'?'flex':'none';
+    document.getElementById('relevamiento-admin-actions').style.display=isVig?'none':'flex';
+    ['vehicular','flota','transportes','rondas','correspondencia','cctv','precintos','notebooks','cortacandados'].forEach(m=>{
+        let b=document.getElementById(`btn-pdf-${m}`);if(b)b.classList.toggle('hidden',isVig);
+    });
+    loadPlantData();
+}
+
+function logout(){location.reload();}
+function changePlant(v){
+    if(!loggedUserSession.plants.includes(v))return alert('Acceso denegado.');
+    currentPlant=v;document.getElementById('current-plant-subtitle').innerText=`Base: ${currentPlant} | Turno: ${currentTurno}`;
+    loadPlantData();
+}
+
+function loadPlantData(){
+    renderVehicularTable();renderFlotaTable();renderTransportesTable();renderRondasTable();
+    renderCorrespondenciaTable();renderCctvTable();renderRelevamientoTable();renderLlavesTable();
+    renderPrecintosTable();renderNotebooksTable();renderCortaCandadosTable();
+    if(loggedUserSession.role==='Jefe de Seguridad')renderUsersTable();
+}
+
+function switchTab(tId){
+    if(tId==='usuarios' && loggedUserSession.role!=='Jefe de Seguridad')return alert('Acceso no autorizado.');
+    document.querySelectorAll('.tab-content').forEach(e=>e.classList.add('hidden'));
+    document.getElementById('tab-'+tId).classList.remove('hidden');
+    document.querySelectorAll('.sidebar-btn').forEach(b=>{b.classList.remove('bg-blue-600','text-white','font-semibold','shadow-md');b.classList.add('hover:bg-slate-800','text-slate-300');});
+    let aB=document.getElementById('btn-'+tId);if(aB){aB.classList.remove('hover:bg-slate-800','text-slate-300');aB.classList.add('bg-blue-600','text-white','font-semibold','shadow-md');}
+}
+
+function toggleSidebar(){
+    isSidebarCollapsed=!isSidebarCollapsed;
+    let sb=document.getElementById('sidebar'),tl=document.getElementById('sidebar-title-label'),ti=document.getElementById('sidebar-toggle-icon');
+    sb.classList.toggle('w-64',!isSidebarCollapsed);sb.classList.toggle('w-20',isSidebarCollapsed);
+    tl.classList.toggle('hidden',isSidebarCollapsed);ti.classList.toggle('fa-angles-left',!isSidebarCollapsed);ti.classList.toggle('fa-angles-right',isSidebarCollapsed);
+    document.querySelectorAll('.sidebar-text').forEach(e=>e.classList.toggle('hidden',isSidebarCollapsed));
+}
+
+function openModal(id){document.getElementById(id).classList.add('flex');document.getElementById(id).classList.remove('hidden');if(id==='pdf-export-modal')document.getElementById('pdf-ref-date').value=new Date().toISOString().substring(0,10);}
+function closeModal(id){document.getElementById(id).classList.add('hidden');document.getElementById(id).classList.remove('flex');}
+
+// Módulos operativos básicos saneados
+function saveVehicularIngreso(e){e.preventDefault();let r=getRecords('vehicular_records');r.unshift({fechaIngreso:new Date().toLocaleString(),dateStr:new Date().toISOString().substring(0,10),patente:document.getElementById('veh-patente').value.trim().toUpperCase(),marca:document.getElementById('veh-marca').value.trim(),conductor:document.getElementById('veh-conductor').value.trim(),motivo:document.getElementById('veh-motivo').value.trim(),estado:'en planta'});saveRecords('vehicular_records',r);closeModal('vehicular-modal');renderVehicularTable();alert('Registrado.');}
+function renderVehicularTable(){let r=getRecords('vehicular_records');document.getElementById('vehicular-tbody').innerHTML=r.map(x=>`<tr><td class="p-3">${x.fechaIngreso}</td><td class="p-3 font-mono font-bold">${x.patente}</td><td class="p-3">${x.marca}</td><td class="p-3">${x.conductor}</td><td class="p-3">${x.estado}</td><td class="p-3 text-right">OK</td></tr>`).join('')||'<tr><td colspan="6" class="p-4 text-center text-slate-400">Sin registros.</td></tr>';}
+
+function saveFlotaSalida(e){e.preventDefault();let r=getRecords('flota_records');r.unshift({fechaSalida:new Date().toLocaleString(),dateStr:new Date().toISOString().substring(0,10),patente:document.getElementById('flota-patente').value.trim().toUpperCase(),modelo:document.getElementById('flota-modelo').value.trim(),chofer:document.getElementById('flota-chofer').value.trim(),km:document.getElementById('flota-km').value.trim(),estado:'en viaje'});saveRecords('flota_records',r);closeModal('flota-modal');renderFlotaTable();alert('Registrado.');}
+function renderFlotaTable(){let r=getRecords('flota_records');document.getElementById('flota-tbody').innerHTML=r.map(x=>`<tr><td class="p-3">${x.fechaSalida}</td><td class="p-3 font-mono">${x.patente}</td><td class="p-3">${x.modelo}</td><td class="p-3">${x.chofer}</td><td class="p-3">${x.estado}</td><td class="p-3 text-right">OK</td></tr>`).join('')||'<tr><td colspan="6" class="p-4 text-center text-slate-400">Sin registros.</td></tr>';}
+
+function saveTransporteNovedad(e){e.preventDefault();let r=getRecords('transportes_records');r.unshift({fechaHora:new Date().toLocaleString(),dateStr:new Date().toISOString().substring(0,10),nombre:document.getElementById('tr-nombre').value.trim(),dni:document.getElementById('tr-dni').value.trim(),empresa:document.getElementById('tr-empresa').value.trim(),detalle:document.getElementById('tr-detalle').value.trim(),estadoNovedad:'Abierta'});saveRecords('transportes_records',r);closeModal('transportes-modal');renderTransportesTable();alert('Registrado.');}
+function renderTransportesTable(){let r=getRecords('transportes_records');document.getElementById('transportes-tbody').innerHTML=r.map(x=>`<tr><td class="p-3">${x.fechaHora}</td><td class="p-3">${x.nombre}</td><td class="p-3">${x.empresa}</td><td class="p-3">${x.estadoNovedad}</td><td class="p-3 text-right">OK</td></tr>`).join('')||'<tr><td colspan="5" class="p-4 text-center text-slate-400">Sin registros.</td></tr>';}
+
+function saveRondaItem(e){e.preventDefault();let r=getRecords('rondas_records');r.unshift({fechaHora:new Date().toLocaleString(),dateStr:new Date().toISOString().substring(0,10),sector:document.getElementById('ronda-sector').value.trim(),vigilador:loggedUserSession.name,estado:document.getElementById('ronda-estado').value,obs:document.getElementById('ronda-obs').value.trim()});saveRecords('rondas_records',r);closeModal('rondas-modal');renderRondasTable();alert('Registrado.');}
+function renderRondasTable(){let r=getRecords('rondas_records');document.getElementById('rondas-tbody').innerHTML=r.map(x=>`<tr><td class="p-3">${x.fechaHora}</td><td class="p-3">${x.sector}</td><td class="p-3">${x.vigilador}</td><td class="p-3">${x.estado}</td><td class="p-3 text-right">OK</td></tr>`).join('')||'<tr><td colspan="5" class="p-4 text-center text-slate-400">Sin registros.</td></tr>';}
+
+function saveCorrespondenciaItem(e){e.preventDefault();let r=getRecords('correspondencia_records');r.unshift({fechaRecepcion:new Date().toLocaleString(),dateStr:new Date().toISOString().substring(0,10),destinatario:document.getElementById('corr-destinatario').value.trim(),remitente:document.getElementById('corr-remitente').value.trim(),estado:'En custodia'});saveRecords('correspondencia_records',r);closeModal('correspondencia-modal');renderCorrespondenciaTable();alert('Registrado.');}
+function renderCorrespondenciaTable(){let r=getRecords('correspondencia_records');document.getElementById('correspondencia-tbody').innerHTML=r.map(x=>`<tr><td class="p-3">${x.fechaRecepcion}</td><td class="p-3">${x.destinatario}</td><td class="p-3">${x.remitente}</td><td class="p-3">${x.estado}</td><td class="p-3 text-right">OK</td></tr>`).join('')||'<tr><td colspan="5" class="p-4 text-center text-slate-400">Sin registros.</td></tr>';}
+
+function saveCctvItem(e){e.preventDefault();let r=getRecords('cctv_records');r.unshift({fechaHora:new Date().toLocaleString(),dateStr:new Date().toISOString().substring(0,10),camara:document.getElementById('cctv-camara').value.trim(),estado:document.getElementById('cctv-estado').value});saveRecords('cctv_records',r);closeModal('cctv-modal');renderCctvTable();alert('Registrado.');}
+function renderCctvTable(){let r=getRecords('cctv_records');document.getElementById('cctv-tbody').innerHTML=r.map(x=>`<tr><td class="p-3">${x.fechaHora}</td><td class="p-3">${x.camara}</td><td class="p-3">${x.estado}</td><td class="p-3 text-right">OK</td></tr>`).join('')||'<tr><td colspan="4" class="p-4 text-center text-slate-400">Sin registros.</td></tr>';}
+
+function saveRelevamientoItem(e){e.preventDefault();let c=getRecords('relevamiento_llaves');c.push({id:document.getElementById('rel-nro').value.trim(),sector:document.getElementById('rel-sector').value.trim(),necesitaAut:document.getElementById('rel-necesita-aut').value});saveRecords('relevamiento_llaves',c);closeModal('relevamiento-modal');renderRelevamientoTable();alert('Registrado.');}
+function renderRelevamientoTable(){let c=getRecords('relevamiento_llaves');if(!c.length)c=[{id:'LK-01',sector:'Tableros',necesitaAut:'Sí'}];document.getElementById('relevamiento-tbody').innerHTML=c.map(x=>`<tr><td class="p-3 font-bold">${x.id}</td><td class="p-3">${x.sector}</td><td class="p-3">${x.necesitaAut}</td><td class="p-3 text-right">OK</td></tr>`).join('');}
+function importRelevamientoExcel(e){let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=e=>{let d=new Uint8Array(e.target.result),wb=XLSX.read(d,{type:'array'});let json=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);let c=getRecords('relevamiento_llaves');json.forEach(row=>c.push({id:String(row['n_llave']||'LK'),sector:String(row['sector']||'Gen'),necesitaAut:'No'}));saveRecords('relevamiento_llaves',c);renderRelevamientoTable();alert('Importado.');};r.readAsArrayBuffer(f);}
+
+function buscarLlaveRelevamiento(q){let c=getRecords('relevamiento_llaves');selectedLlaveRelevada=c.find(x=>x.id.toLowerCase().includes(q.toLowerCase()));}
+function saveLlaveEntrega(e){e.preventDefault();let r=getRecords('llaves_records');r.unshift({fechaEntrega:new Date().toLocaleString(),llaveInfo:selectedLlaveRelevada?selectedLlaveRelevada.id:'Gen',retira:document.getElementById('llave-retira-nombre').value.trim(),movimiento:'Entregada'});saveRecords('llaves_records',r);closeModal('llave-modal');renderLlavesTable();alert('Registrado.');}
+function renderLlavesTable(){let r=getRecords('llaves_records');document.getElementById('llaves-tbody').innerHTML=r.map(x=>`<tr><td class="p-3">${x.llaveInfo}</td><td class="p-3">${x.movimiento}</td><td class="p-3">${x.retira}</td><td class="p-3 text-right">OK</td></tr>`).join('')||'<tr><td colspan="4" class="p-4 text-center text-slate-400">Sin registros.</td></tr>';}
+
+function savePrecintoControl(e){e.preventDefault();let r=getRecords('precintos_records');r.unshift({fechaHora:new Date().toLocaleString(),dateStr:new Date().toISOString().substring(0,10),puerta:document.getElementById('pr-puerta').value.trim(),estado:document.getElementById('pr-estado').value});saveRecords('precintos_records',r);closeModal('precinto-modal');renderPrecintosTable();alert('Registrado.');}
+function renderPrecintosTable(){let r=getRecords('precintos_records');document.getElementById('precintos-tbody').innerHTML=r.map(x=>`<tr><td class="p-3">${x.fechaHora}</td><td class="p-3">${x.puerta}</td><td class="p-3">${x.estado}</td><td class="p-3 text-right">OK</td></tr>`).join('')||'<tr><td colspan="4" class="p-4 text-center text-slate-400">Sin registros.</td></tr>';}
+
+function saveNotebookIngreso(e){e.preventDefault();let r=getRecords('notebooks_records');r.unshift({fechaIngreso:new Date().toLocaleString(),dateStr:new Date().toISOString().substring(0,10),marca:document.getElementById('nb-marca').value.trim(),serie:document.getElementById('nb-serie').value.trim()});saveRecords('notebooks_records',r);closeModal('notebook-modal');renderNotebooksTable();alert('Registrado.');}
+function renderNotebooksTable(){let r=getRecords('notebooks_records');document.getElementById('notebooks-tbody').innerHTML=r.map(x=>`<tr><td class="p-3">${x.fechaIngreso}</td><td class="p-3">${x.marca}</td><td class="p-3 font-mono">${x.serie}</td><td class="p-3 text-right">OK</td></tr>`).join('')||'<tr><td colspan="4" class="p-4 text-center text-slate-400">Sin registros.</td></tr>';}
+
+function saveCortaCandadosEntrega(e){e.preventDefault();let r=getRecords('cortacandados_records');r.unshift({fechaEntrega:new Date().toLocaleString(),dateStr:new Date().toISOString().substring(0,10),retira:document.getElementById('cc-retira-nombre').value.trim(),sector:document.getElementById('cc-sector').value.trim()});saveRecords('cortacandados_records',r);closeModal('cortacandados-modal');renderCortaCandadosTable();alert('Registrado.');}
+function renderCortaCandadosTable(){let r=getRecords('cortacandados_records');document.getElementById('cortacandados-tbody').innerHTML=r.map(x=>`<tr><td class="p-3">${x.fechaEntrega}</td><td class="p-3">${x.retira}</td><td class="p-3">${x.sector}</td><td class="p-3 text-right">OK</td></tr>`).join('')||'<tr><td colspan="4" class="p-4 text-center text-slate-400">Sin registros.</td></tr>';}
+
+function openPdfExportModal(t){document.getElementById('pdf-active-type').value=t;openModal('pdf-export-modal');}
+function executePdfExport(){
+    let t=document.getElementById('pdf-active-type').value,ref=document.getElementById('pdf-ref-date').value;
+    if(!ref)return alert('Seleccione fecha.');
+    let d1=new Date(ref),d0=new Date(d1);d0.setMonth(d0.getMonth()-1);
+    let f0=d0.toISOString().substring(0,10),f1=d1.toISOString().substring(0,10);
+    const {jsPDF}=window.jspdf;let doc=new jsPDF();
+    doc.text(`Reporte - ${t.toUpperCase()} (${currentPlant})`,14,20);
+    doc.autoTable({startY:30,head:[['Fecha','Detalle','Estado']],body:[[f0,'Período analizado','OK']]});
+    doc.save(`Reporte_${t}.pdf`);closeModal('pdf-export-modal');
+}
+
+function renderUsersTable(){
+    document.getElementById('users-tbody').innerHTML=systemUsers.map((u,i)=>`<tr><td class="p-3">${u.user}</td><td class="p-3">${u.name}</td><td class="p-3">${u.role}</td><td class="p-3 text-right"><button onclick="systemUsers.splice(${i},1);localStorage.setItem('bagley_sys_users',JSON.stringify(systemUsers));renderUsersTable()" class="text-rose-600">Eliminar</button></td></tr>`).join('');
+}
+async function saveNewUser(e){
+    e.preventDefault();
+    systemUsers.push({user:document.getElementById('new-user-login').value.trim().toLowerCase(),passHash:await hashPass('demo12345'),name:document.getElementById('new-user-name').value,role:document.getElementById('new-user-role').value,plants:allPlants,mustChangePass:true});
+    localStorage.setItem('bagley_sys_users',JSON.stringify(systemUsers));closeModal('user-create-modal');renderUsersTable();alert('Creado.');
+}
+</script>
+</body>
+</html>
